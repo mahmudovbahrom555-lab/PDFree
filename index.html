@@ -48,7 +48,6 @@
   <meta http-equiv="Content-Security-Policy" content="
     default-src 'self';
     script-src  'self'
-                https://cdnjs.cloudflare.com
                 https://plausible.io
                 https://pagead2.googlesyndication.com;
     style-src   'self' 'unsafe-inline'
@@ -56,7 +55,6 @@
     font-src    https://fonts.gstatic.com;
     img-src     'self' data: blob: https:;
     connect-src 'self'
-                https://cdnjs.cloudflare.com
                 https://plausible.io
                 https://pagead2.googlesyndication.com
                 https://www.googletagservices.com
@@ -177,19 +175,19 @@
     <div class="section-label">All tools</div>
     <div class="tools-grid">
       <div class="tool-card featured" data-tool="merge" tabindex="0" role="button" aria-label="Merge PDF">
-        <span class="tool-icon">🔗</span>
+        <span class="tool-icon" data-icon="merge"></span>
         <div class="tool-name">Merge PDF</div>
         <div class="tool-desc">Combine any number of PDFs — no restrictions</div>
       </div>
-      <div class="tool-card" data-tool="split"     tabindex="0" role="button"><span class="tool-icon">✂️</span><div class="tool-name">Split PDF</div><div class="tool-desc">Extract pages or split into separate files</div></div>
-      <div class="tool-card" data-tool="compress"  tabindex="0" role="button"><span class="tool-icon">🗜️</span><div class="tool-name">Compress PDF</div><div class="tool-desc">Reduce file size without losing quality</div></div>
-      <div class="tool-card" data-tool="jpg2pdf"   tabindex="0" role="button"><span class="tool-icon">🖼️</span><div class="tool-name">JPG to PDF</div><div class="tool-desc">Convert images to PDF instantly</div></div>
-      <div class="tool-card" data-tool="pdf2jpg"   tabindex="0" role="button"><span class="tool-icon">📸</span><div class="tool-name">PDF to JPG</div><div class="tool-desc">Extract pages as high-quality images</div></div>
-      <div class="tool-card" data-tool="extract"   tabindex="0" role="button"><span class="tool-icon">📑</span><div class="tool-name">Extract Pages</div><div class="tool-desc">Pull selected pages into a new PDF</div></div>
-      <div class="tool-card" data-tool="watermark" tabindex="0" role="button"><span class="tool-icon">💧</span><div class="tool-name">Watermark</div><div class="tool-desc">Stamp text on every page — diagonal or tiled</div></div>
-      <div class="tool-card" data-tool="pagenum"   tabindex="0" role="button"><span class="tool-icon">🔢</span><div class="tool-name">Page Numbers</div><div class="tool-desc">Add numbered footers — Arabic, Roman or ABC</div></div>
-      <div class="tool-card" data-tool="meta"      tabindex="0" role="button"><span class="tool-icon">🏷️</span><div class="tool-name">Edit Metadata</div><div class="tool-desc">View and edit title, author, keywords</div></div>
-      <div class="tool-card" data-tool="rotate"    tabindex="0" role="button"><span class="tool-icon">🔄</span><div class="tool-name">Rotate PDF <span class="tool-badge">Soon</span></div><div class="tool-desc">Fix page orientation in any PDF</div></div>
+      <div class="tool-card" data-tool="split"     tabindex="0" role="button" aria-label="Split PDF"><span class="tool-icon" data-icon="split"></span><div class="tool-name">Split PDF</div><div class="tool-desc">Extract pages or split into separate files</div></div>
+      <div class="tool-card" data-tool="compress"  tabindex="0" role="button" aria-label="Compress PDF"><span class="tool-icon" data-icon="compress"></span><div class="tool-name">Compress PDF</div><div class="tool-desc">Reduce file size while preserving quality</div></div>
+      <div class="tool-card" data-tool="jpg2pdf"   tabindex="0" role="button" aria-label="JPG to PDF"><span class="tool-icon" data-icon="jpg2pdf"></span><div class="tool-name">JPG to PDF</div><div class="tool-desc">Convert images to PDF instantly</div></div>
+      <div class="tool-card" data-tool="pdf2jpg"   tabindex="0" role="button" aria-label="PDF to JPG"><span class="tool-icon" data-icon="pdf2jpg"></span><div class="tool-name">PDF to JPG</div><div class="tool-desc">Extract pages as high-quality images</div></div>
+      <div class="tool-card" data-tool="extract"   tabindex="0" role="button" aria-label="Extract Pages"><span class="tool-icon" data-icon="extract"></span><div class="tool-name">Extract Pages</div><div class="tool-desc">Pull selected pages into a new PDF</div></div>
+      <div class="tool-card" data-tool="watermark" tabindex="0" role="button" aria-label="Watermark"><span class="tool-icon" data-icon="watermark"></span><div class="tool-name">Watermark</div><div class="tool-desc">Stamp text on every page</div></div>
+      <div class="tool-card" data-tool="pagenum"   tabindex="0" role="button" aria-label="Page Numbers"><span class="tool-icon" data-icon="pagenum"></span><div class="tool-name">Page Numbers</div><div class="tool-desc">Add numbered footers</div></div>
+      <div class="tool-card" data-tool="meta"      tabindex="0" role="button" aria-label="Metadata Editor"><span class="tool-icon" data-icon="meta"></span><div class="tool-name">Edit Metadata</div><div class="tool-desc">View and edit title, author, keywords</div></div>
+      <div class="tool-card" data-tool="rotate"    tabindex="0" role="button" aria-label="Rotate PDF"><span class="tool-icon" data-icon="rotate"></span><div class="tool-name">Rotate PDF <span class="tool-badge">Soon</span></div><div class="tool-desc">Fix page orientation in any PDF</div></div>
     </div>
   </section>
 
@@ -341,7 +339,7 @@
       Open source under the
       <a href="https://www.gnu.org/licenses/agpl-3.0.html" target="_blank" rel="noopener" style="color:var(--green)">GNU AGPLv3</a>
       &nbsp;·&nbsp;
-      <a href="https://github.com/yourusername/pdfree" target="_blank" rel="noopener" style="color:var(--green)">View source on GitHub</a>
+      <a href="https://github.com/mahmudovbahrom555-lab/PDFree" target="_blank" rel="noopener" style="color:var(--green)">View source on GitHub</a>
     </span>
   </footer>
 
@@ -349,8 +347,8 @@
 
   <!-- JSZip для создания ZIP-архива при Split PDF -->
   <!-- pdf-lib нужен в основном потоке для splitUI.js (window.PDFLib) -->
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf-lib/1.17.1/pdf-lib.min.js"></script>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+  <script src="js/vendor/pdf-lib.min.js"></script>
+  <script src="js/vendor/jszip.min.js"></script>
   <script type="module" src="js/app.js"></script>
 
 </body>

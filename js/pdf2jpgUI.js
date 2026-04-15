@@ -262,8 +262,7 @@ function _updateCount() {
 // Подключаем только при первом открытии PDF→JPG,
 // не при старте приложения. ~1.5 МБ не грузится зря.
 
-const PDFJS_VERSION = '3.11.174';
-const PDFJS_CDN = `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/${PDFJS_VERSION}`;
+const PDFJS_CDN = `js/vendor`;
 
 let _pdfJsLoading = null;  // in-flight Promise — prevents concurrent loads
 let _pdfJsRetries = 0;

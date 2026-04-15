@@ -6,7 +6,8 @@
 //  Всё что связано с отображением, но не с бизнес-логикой
 // ============================================================
 
-import { id, show, hide, setText } from './utils.js';
+import { id, show, hide, setText, getIconHtml } from './utils.js';
+import { ICONS } from './config.js';
 
 // ── Toast ──────────────────────────────────────────────────
 
@@ -19,6 +20,7 @@ let _toastTimer = null;
  */
 export function showToast(message, duration = 3000) {
   const el = id('toast');
+  if (!el) return;
   el.textContent = message;
   el.classList.add('show');
   clearTimeout(_toastTimer);
@@ -36,6 +38,7 @@ export function setProgress(percent, label = '') {
   const bar  = id('progressBar');
   const fill = id('progressFill');
   const lbl  = id('progressLabel');
+  if (!bar || !fill || !lbl) return;
 
   bar.style.display = 'block';
   lbl.style.display = 'block';
@@ -47,7 +50,8 @@ export function setProgress(percent, label = '') {
 export function hideProgress() {
   hide('progressBar');
   hide('progressLabel');
-  id('progressFill').style.width = '0%';
+  const fill = id('progressFill');
+  if (fill) fill.style.width = '0%';
 }
 
 // ── Page sections visibility ───────────────────────────────
@@ -72,10 +76,17 @@ export function showToolPage() {
 
 /**
  * Обновляет заголовок инструмента
- * @param {{ icon: string, title: string, desc: string }} tool
+ * @param {{ icon: string, title: string, desc: string, name?: string }} tool
  */
 export function renderToolHeader(tool) {
-  setText('toolIcon',  tool.icon);
+  const iconEl = id('toolIcon');
+  if (iconEl) {
+    if (ICONS[tool.name || '']) {
+      iconEl.innerHTML = getIconHtml(tool.name, ICONS, 40);
+    } else {
+      iconEl.textContent = tool.icon || '';
+    }
+  }
   setText('toolTitle', tool.title);
   setText('toolDesc',  tool.desc);
   document.title = tool.title + ' — PDFree';
@@ -88,6 +99,7 @@ export function renderToolHeader(tool) {
  */
 export function setButtonProcessing() {
   const btn = id('mergeBtn');
+  if (!btn) return;
   btn.disabled = true;
   btn.textContent = '⏳ Processing...';
 }
@@ -98,6 +110,7 @@ export function setButtonProcessing() {
  */
 export function setButtonReady(label) {
   const btn = id('mergeBtn');
+  if (!btn) return;
   btn.disabled = false;
   btn.textContent = label;
 }
@@ -106,22 +119,18 @@ export function setButtonReady(label) {
  * Блокирует кнопку (нет файлов)
  */
 export function setButtonDisabled() {
-  id('mergeBtn').disabled = true;
+  const btn = id('mergeBtn');
+  if (btn) btn.disabled = true;
 }
 
 // ── Cancel button ──────────────────────────────────────────
-// Единственное место управления видимостью кнопки отмены.
-// Раньше логика дублировалась в processor.js и app.js —
-// теперь оба модуля импортируют эти функции из ui.js.
 
 /** Показывает кнопку отмены */
 export function showCancelBtn() {
-  const btn = id('cancelBtn');
-  if (btn) btn.style.display = 'block';
+  show('cancelBtn');
 }
 
 /** Скрывает кнопку отмены */
 export function hideCancelBtn() {
-  const btn = id('cancelBtn');
-  if (btn) btn.style.display = 'none';
+  hide('cancelBtn');
 }

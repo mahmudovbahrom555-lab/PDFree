@@ -42,7 +42,8 @@ export function id(elementId) {
  * @param {string} elementId
  */
 export function show(elementId) {
-  id(elementId).style.display = '';
+  const el = id(elementId);
+  if (el) el.style.display = '';
 }
 
 /**
@@ -50,7 +51,8 @@ export function show(elementId) {
  * @param {string} elementId
  */
 export function hide(elementId) {
-  id(elementId).style.display = 'none';
+  const el = id(elementId);
+  if (el) el.style.display = 'none';
 }
 
 /**
@@ -59,14 +61,24 @@ export function hide(elementId) {
  * @param {string} value
  */
 export function setText(elementId, value) {
-  id(elementId).textContent = value;
+  const el = id(elementId);
+  if (el) el.textContent = value;
+}
+
+/**
+ * Returns SVG HTML for a given tool icon name.
+ * @param {string} name - tool name (e.g. 'merge')
+ * @param {Record<string, string>} iconsMap - mapping of keys to SVG paths
+ * @param {number} size - size in px
+ * @returns {string} SVG HTML
+ */
+export function getIconHtml(name, iconsMap, size = 24) {
+  const path = iconsMap[name] || '';
+  return `<svg xmlns="http://www.w3.org/2000/svg" width="${size}" height="${size}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-${name}">${path}</svg>`;
 }
 
 /**
  * Проверяет, соответствует ли файл допустимым MIME-типам.
- * Атрибут accept на <input> не защищает от drag-and-drop —
- * браузер применяет его только к диалогу выбора файлов.
- *
  * @param {File}     file          - файл для проверки
  * @param {string}   acceptString  - строка accept из config, e.g. ".pdf"
  * @param {Record<string, string[]>} mimeMap - карта ACCEPTED_MIME из config
@@ -74,12 +86,10 @@ export function setText(elementId, value) {
  */
 export function isFileAccepted(file, acceptString, mimeMap) {
   const allowed = mimeMap[acceptString];
-  if (!allowed) return true; // если карты нет — пропускаем (не блокируем)
+  if (!allowed) return true;
 
-  // Проверяем MIME-тип (надёжнее расширения, но может быть пустым на некоторых ОС)
   if (file.type && allowed.includes(file.type)) return true;
 
-  // Запасная проверка по расширению (для случаев когда MIME пустой)
   const ext = file.name.split('.').pop()?.toLowerCase();
   return acceptString.split(',').some(a => a.trim() === '.' + ext);
 }

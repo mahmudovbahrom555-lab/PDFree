@@ -18,7 +18,7 @@
 //  the activate handler to clear the old cache.
 // ============================================================
 
-const CACHE_VERSION  = 'v2';   // bumped: fixes staleWhileRevalidate null bug + CSP blob: update
+const CACHE_VERSION  = 'v3';   // bumped: added local vendor libs for offline support
 const STATIC_CACHE   = `pdfree-static-${CACHE_VERSION}`;
 const CDN_CACHE      = `pdfree-cdn-${CACHE_VERSION}`;
 const ALL_CACHES     = [STATIC_CACHE, CDN_CACHE];
@@ -56,6 +56,8 @@ const STATIC_ASSETS = [
   '/icons/icon-128.png',
   '/icons/icon-192.png',
   '/icons/icon-512.png',
+  '/js/vendor/pdf-lib.min.js',
+  '/js/vendor/jszip.min.js',
 ];
 
 // CDN assets — cache on first use (versioned URLs, safe to store)

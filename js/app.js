@@ -7,8 +7,8 @@
 // ============================================================
 
 import { TOOLS, DONATE_URL, USAGE_KEY, DONATE_DELAY_MS,
-         DONATE_PERSONAL_THRESHOLD }               from './config.js';
-import { id, hide, setText }                      from './utils.js';
+         DONATE_PERSONAL_THRESHOLD, ICONS }       from './config.js';
+import { id, hide, setText, getIconHtml }         from './utils.js';
 import { showHomePage, showToolPage,
          renderToolHeader, setButtonReady,
          setButtonDisabled, hideCancelBtn,
@@ -58,7 +58,7 @@ function showTool(tool) {
   const t = TOOLS[tool];
 
   showToolPage();
-  renderToolHeader(t);
+  renderToolHeader({ ...t, name: tool });
   setCurrentTool(tool, t.accept);
 
   id('fileInput').multiple = t.multi;
@@ -302,9 +302,19 @@ function _skipDonate() {
 
 // ── Init ──────────────────────────────────────────────────────
 
+function _injectIcons() {
+  document.querySelectorAll('[data-icon]').forEach(el => {
+    const name = el.dataset.icon;
+    if (ICONS[name]) {
+      el.innerHTML = getIconHtml(name, ICONS, 24);
+    }
+  });
+}
+
 window.addEventListener('load', () => {
   initFileListeners();
   initEvents();
+  _injectIcons();
   showAdZoneA();
   _initPWA();
   const toolParam = new URLSearchParams(location.search).get('tool');

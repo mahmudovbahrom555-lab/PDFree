@@ -377,138 +377,69 @@ function _yieldToUI() {
 
 const _FRAME_BUDGET_MS = 16;   // ≈ one 60 FPS frame
 
-async function _runPdf2Jpg(filesSnapshot, { pages, format, dpi, zip }) {
+async function _runPdf2Jpg(filesSnapshot, params) {
   const file   = filesSnapshot[0];
-  const scale  = dpi / 72;
-  const mime   = format === 'png' ? 'image/png' : 'image/jpeg';
-  const ext    = format === 'png' ? 'png' : 'jpg';
-  const quality = format === 'jpg' ? 0.92 : undefined;
-
-  // pdf.js должен быть загружен к этому моменту через pdf2jpgUI.initPdf2JpgOptions
-  if (!window.pdfjsLib) {
-    _handleError('pdf2jpg', 'PDF renderer not loaded — please reopen the tool');
-    isProcessing = false; setFilesLocked(false); hideCancelBtn();
-    return;
-  }
-
+  const buffer = await file.arrayBuffer();
   setProgress(5, 'Loading PDF…');
 
-  const url = URL.createObjectURL(file);
-  let pdfDoc;
-  try {
-    pdfDoc = await window.pdfjsLib.getDocument({ url }).promise;
-  } catch (err) {
-    URL.revokeObjectURL(url);
-    isProcessing = false; setFilesLocked(false); hideCancelBtn();
-    _handleError('pdf2jpg', err.message); return;
-  }
+  // ⚠️  TRANSFERABLE: buffer detached after this call.
+  _worker.postMessage(
+    { tool: 'pdf2jpg', file: buffer, options: params },
+    [buffer]
+  );
 
-  const validPages = pages.filter(p => p >= 1 && p <= pdfDoc.numPages);
-  if (validPages.length === 0) {
-    URL.revokeObjectURL(url);
-    isProcessing = false; setFilesLocked(false); hideCancelBtn();
-    _handleError('pdf2jpg', 'No valid pages selected'); return;
-  }
+  _worker.onmessage = async (e) => {
+    const data = e.data;
+    if (data.type === 'progress') {
+      setProgress(data.value, data.label);
+    } else if (data.type === 'done') {
+      isProcessing = false;
+      setFilesLocked(false);
+      hideCancelBtn();
+      setProgress(100, 'Done!');
 
-  // ── Memory-efficient streaming pipeline ─────────────────────────
-  // Problem: accumulating all page ArrayBuffers before zipping them
-  // costs O(pages × pageSize) RAM. At 300 DPI a 200-page PDF = ~1 GB.
-  // Solution: feed pages into JSZip immediately after render, then
-  // drop the reference. Peak RAM stays at ~2 pages at a time.
-  //
-  // Two modes:
-  //   zip=true   → streaming into JSZip as pages render
-  //   zip=false  → buffer only 1 page (already bounded)
-  let streamZip   = null;
-  let streamCount = 0;
-  let singleResult = null;
-  let canvas = document.createElement('canvas');
-  const ctx  = canvas.getContext('2d');
+      const { result, format, zip, successCount } = data;
+      const ext = format === 'png' ? 'PNG' : 'JPG';
 
-  try {
-    let frameStart = performance.now();   // tracks time since last yield
+      let finalBlob, finalFilename, finalDesc;
 
-    for (let i = 0; i < validPages.length; i++) {
-      if (!isProcessing) return;
-
-      const pageNum  = validPages[i];
-      setProgress(10 + Math.round((i / validPages.length) * 80),
-                  `Rendering page ${i + 1} of ${validPages.length}…`);
-
-      try {
-        const page     = await pdfDoc.getPage(pageNum);
-        const viewport = page.getViewport({ scale });
-        canvas.width   = Math.round(viewport.width);
-        canvas.height  = Math.round(viewport.height);
-        await page.render({ canvasContext: ctx, viewport }).promise;
-
-        const blob = await new Promise(res => canvas.toBlob(res, mime, quality));
-        const buf  = await blob.arrayBuffer();
-        const baseName = file.name.replace(/\.pdf$/i, '');
-        const name     = `${baseName}-page${pageNum}.${ext}`;
-
-        if (!zip || validPages.length === 1) {
-          singleResult = { name, buffer: buf };
-        } else {
-          if (!streamZip) streamZip = new (window.JSZip)();
-          streamZip.file(name, buf);
-          streamCount++;
+      if (!zip || result.length === 1) {
+        // Individual image (Blob)
+        const item = result[0];
+        finalBlob     = new Blob([item.buffer], { type: format === 'png' ? 'image/png' : 'image/jpeg' });
+        const base    = file.name.replace(/\.pdf$/i, '');
+        finalFilename = item.name.replace('page', base + '-page');
+        finalDesc     = `1 page · ${ext} · ${fmtSize(finalBlob.size)}`;
+      } else {
+        // Multi-page ZIP
+        const JSZip = window.JSZip;
+        if (!JSZip) { _handleError('pdf2jpg', 'JSZip not loaded'); return; }
+        const zipObj = new JSZip();
+        const base   = file.name.replace(/\.pdf$/i, '');
+        
+        for (const item of result) {
+          zipObj.file(item.name.replace('page', base + '-page'), item.buffer);
         }
-
-        // Time-budget yield: only pause the UI thread when we've consumed
-        // a full frame's worth of time. For fast pages (small/low-DPI) we
-        // may render several pages per frame with no unnecessary pauses.
-        // For slow pages (large/high-DPI) we yield after every single page.
-        const now = performance.now();
-        if (now - frameStart >= _FRAME_BUDGET_MS) {
-          await _yieldToUI();
-          frameStart = performance.now();   // reset budget after yield
-        }
-      } catch (err) {
-        showToast(`⚠️ Page ${pageNum} failed: ${err.message}`, 4000);
+        
+        setProgress(95, 'Packaging ZIP…');
+        finalBlob = await zipObj.generateAsync({ type: 'blob', compression: 'STORE' });
+        finalFilename = `${base}-images.zip`;
+        finalDesc     = `${successCount} ${ext} images · ${fmtSize(finalBlob.size)}`;
       }
+
+      document.dispatchEvent(new CustomEvent('pdfree:success', {
+        detail: { tool: 'pdf2jpg', blob: finalBlob, desc: finalDesc, filename: finalFilename }
+      }));
+    } else if (data.type === 'error') {
+      isProcessing = false; setFilesLocked(false); hideCancelBtn();
+      _handleError('pdf2jpg', data.message);
     }
-  } finally {
-    // Zero canvas dimensions → releases GPU texture memory immediately.
-    // canvas = null signals to GC and future readers: intentionally released.
-    canvas.width  = 0;
-    canvas.height = 0;
-    canvas.remove();
-    canvas = null;
-    URL.revokeObjectURL(url);
-  }
+  };
 
-  const successCount = streamZip ? streamCount : (singleResult ? 1 : 0);
-  if (successCount === 0) {
+  _worker.onerror = (e) => {
     isProcessing = false; setFilesLocked(false); hideCancelBtn();
-    _handleError('pdf2jpg', 'No pages were rendered successfully'); return;
-  }
-
-  setProgress(93, 'Packaging…');
-
-  let blob, filename, desc;
-  if (!zip || validPages.length === 1) {
-    blob     = new Blob([singleResult.buffer], { type: mime });
-    filename = singleResult.name;
-    desc     = `1 page · ${ext.toUpperCase()} · ${fmtSize(blob.size)}`;
-  } else {
-    blob = await streamZip.generateAsync(
-      { type: 'blob', compression: 'STORE' },   // images already compressed — no re-deflate
-      meta => setProgress(93 + Math.round(meta.percent / 100 * 5), 'Packaging…')
-    );
-    const baseName = file.name.replace(/\.pdf$/i, '');
-    filename = `${baseName}-images.zip`;
-    desc     = `${streamCount} ${ext.toUpperCase()} images · ${fmtSize(blob.size)}`;
-  }
-
-  isProcessing = false;
-  setFilesLocked(false);
-  hideCancelBtn();
-  setProgress(100, 'Done!');
-
-  document.dispatchEvent(new CustomEvent('pdfree:success', {
-    detail: { tool: 'pdf2jpg', blob, desc, filename }
-  }));
+    _handleError('pdf2jpg', e.message || 'Worker error');
+  };
 }
 
 // ── Generic single-file worker tool ───────────────────────────

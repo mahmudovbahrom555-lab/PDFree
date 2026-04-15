@@ -7,7 +7,13 @@
 //  Теперь это ОТДЕЛЬНЫЙ ФАЙЛ, не inline blob — легче дебажить
 // ============================================================
 
-importScripts('https://cdnjs.cloudflare.com/ajax/libs/pdf-lib/1.17.1/pdf-lib.min.js');
+importScripts('vendor/pdf-lib.min.js');
+importScripts('vendor/pdf.min.js');
+
+// Initialize pdf.js in worker
+if (self.pdfjsLib) {
+  self.pdfjsLib.GlobalWorkerOptions.workerSrc = 'vendor/pdf.worker.min.js';
+}
 
 self.onmessage = async function (e) {
   const { tool, files } = e.data;
@@ -28,6 +34,9 @@ self.onmessage = async function (e) {
         break;
       case 'watermark':
         await handleWatermark(e.data.file, e.data.options);
+        break;
+      case 'pdf2jpg':
+        await handlePdf2Jpg(e.data.file, e.data.options);
         break;
       case 'pagenum':
         await handlePageNum(e.data.file, e.data.options);
@@ -685,4 +694,73 @@ async function handleMeta(fileBuffer, { meta }) {
       try { pdf.catalog.delete(PDFLib.PDFName.of('Metadata')); } catch {}
     }
   });
+}
+
+/**
+ * PDF -> JPG/PNG rendering inside Worker via OffscreenCanvas
+ */
+async function handlePdf2Jpg(originalBuffer, options) {
+  const { pages, format, dpi, zip } = options;
+  const scale   = dpi / 72;
+  const mime    = format === 'png' ? 'image/png' : 'image/jpeg';
+  const ext     = format === 'png' ? 'png' : 'jpg';
+  const quality = format === 'jpg' ? 0.92 : undefined;
+
+  const pdfDoc = await self.pdfjsLib.getDocument({ data: originalBuffer }).promise;
+  const validPages = pages.filter(p => p >= 1 && p <= pdfDoc.numPages);
+
+  if (validPages.length === 0) {
+    throw new Error('No valid pages selected');
+  }
+
+  // Use OffscreenCanvas for rendering
+  const canvas = new OffscreenCanvas(1, 1);
+  const ctx    = canvas.getContext('2d');
+
+  let results = [];
+  let successCount = 0;
+
+  for (let i = 0; i < validPages.length; i++) {
+    const pageNum = validPages[i];
+    self.postMessage({
+      type: 'progress',
+      value: 10 + Math.round((i / validPages.length) * 80),
+      label: `Rendering page ${i + 1} of ${validPages.length}…`
+    });
+
+    try {
+      const page     = await pdfDoc.getPage(pageNum);
+      const viewport = page.getViewport({ scale });
+      canvas.width   = Math.round(viewport.width);
+      canvas.height  = Math.round(viewport.height);
+
+      await page.render({ canvasContext: ctx, viewport }).promise;
+
+      // OffscreenCanvas.convertToBlob is supported in workers
+      const blob = await canvas.convertToBlob({ type: mime, quality });
+      const buf  = await blob.arrayBuffer();
+      
+      results.push({
+        name: `page-${pageNum}.${ext}`,
+        buffer: buf
+      });
+      successCount++;
+    } catch (err) {
+      console.warn(`Worker: Page ${pageNum} failed:`, err);
+    }
+  }
+
+  if (successCount === 0) {
+    throw new Error('No pages were rendered successfully');
+  }
+
+  // Transfer buffers back to main thread
+  const resultBuffers = results.map(r => r.buffer);
+  self.postMessage({
+    type: 'done',
+    result: results,
+    format,
+    zip,
+    successCount
+  }, resultBuffers);
 }
