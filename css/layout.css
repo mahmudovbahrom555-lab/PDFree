@@ -1,0 +1,159 @@
+/* SPDX-License-Identifier: AGPL-3.0-only
+   Copyright (C) 2025 PDFree Contributors  https://github.com/yourusername/pdfree */
+
+/* ============================================================
+   layout.css — Page-level layout: nav, hero, tool grid, footer
+   ============================================================ */
+
+/* ── Navigation ── */
+nav {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 18px 40px;
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+  position: sticky;
+  top: 0;
+  z-index: 100;
+}
+
+.logo {
+  font-size: 20px;
+  font-weight: 600;
+  letter-spacing: -0.5px;
+  cursor: pointer;
+}
+.logo span { color: var(--green); }
+
+.nav-links { display: flex; gap: 8px; }
+
+.nav-link {
+  font-size: 13px;
+  color: var(--text2);
+  padding: 6px 14px;
+  border-radius: 20px;
+  cursor: pointer;
+  border: none;
+  background: transparent;
+  font-family: var(--font-sans);
+  transition: all var(--transition-normal);
+}
+.nav-link:hover,
+.nav-link:focus {
+  background: var(--surface2);
+  color: var(--text);
+  outline: none;
+}
+
+/* ── Hero ── */
+.hero {
+  text-align: center;
+  padding: 72px 24px 56px;
+}
+
+.hero-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: var(--green-light);
+  color: var(--green);
+  font-size: 12px;
+  font-weight: 500;
+  padding: 5px 14px;
+  border-radius: 20px;
+  margin-bottom: 20px;
+}
+.hero-badge::before {
+  content: '';
+  width: 6px;
+  height: 6px;
+  background: var(--green-mid);
+  border-radius: 50%;
+  animation: pulse 2s infinite;
+}
+
+.hero h1 {
+  font-size: clamp(32px, 5vw, 54px);
+  font-weight: 600;
+  letter-spacing: -1.5px;
+  line-height: 1.1;
+  margin-bottom: 16px;
+}
+.hero h1 em { font-style: normal; color: var(--green); }
+
+.hero p {
+  font-size: 17px;
+  color: var(--text2);
+  max-width: 480px;
+  margin: 0 auto;
+  line-height: 1.6;
+  font-weight: 300;
+}
+
+/* ── No-limit bar ── */
+.no-limit-bar {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 24px;
+  padding: 20px;
+  background: var(--surface);
+  border-top: 1px solid var(--border);
+  border-bottom: 1px solid var(--border);
+  margin-bottom: 40px;
+  flex-wrap: wrap;
+}
+.no-limit-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  color: var(--text2);
+}
+.no-limit-item span { color: var(--green); }
+
+/* ── Tools grid ── */
+.tools-section {
+  padding: 0 40px 80px;
+  max-width: 1100px;
+  margin: 0 auto;
+}
+.section-label {
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--text3);
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  margin-bottom: 16px;
+}
+.tools-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: 12px;
+}
+
+/* ── Main tool area ── */
+.main-area {
+  max-width: 780px;
+  margin: 0 auto 80px;
+  padding: 0 24px;
+}
+
+/* ── Footer ── */
+footer {
+  text-align: center;
+  padding: 40px 24px;
+  font-size: 12px;
+  color: var(--text3);
+  border-top: 1px solid var(--border);
+  margin-top: 40px;
+}
+
+/* ── Responsive ── */
+@media (max-width: 600px) {
+  nav               { padding: 14px 20px; }
+  .tools-section    { padding: 0 16px 60px; }
+  .hero             { padding: 48px 16px 40px; }
+  .no-limit-bar     { gap: 12px; }
+}
