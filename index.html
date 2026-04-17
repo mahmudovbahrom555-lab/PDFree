@@ -50,7 +50,7 @@
     script-src  'self'
                 https://plausible.io
                 https://pagead2.googlesyndication.com;
-    style-src   'self'
+    style-src   'self' 'unsafe-inline'
                 https://fonts.googleapis.com;
     font-src    https://fonts.gstatic.com;
     img-src     'self' data: blob: https:;
@@ -72,13 +72,13 @@
   <meta property="og:type"        content="website">
 
   <!-- PWA -->
-  <link rel="manifest" href="/manifest.json">
+  <link rel="manifest" href="manifest.json">
   <meta name="theme-color" content="#2D7A4F">
   <meta name="mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="default">
   <meta name="apple-mobile-web-app-title" content="PDFree">
-  <link rel="apple-touch-icon" href="/icons/icon-192.png">
+  <link rel="apple-touch-icon" href="icons/icon-192.png">
 
   <!-- Privacy-first analytics (no cookies, GDPR compliant) -->
   <!-- Replace pdfree.com with your actual domain after deployment -->
