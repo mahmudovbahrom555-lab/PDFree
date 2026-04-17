@@ -15,7 +15,8 @@
 import { id }      from './utils.js';
 import { showToast } from './ui.js';
 import { fmtSize }  from './utils.js';
-import { chip, sliderRow, checkbox, loadingRow } from './uiComponents.js';
+import { loadingRow, checkbox } from './uiComponents.js';
+import { runPrescan } from './processor.js';
 
 // ── State ──────────────────────────────────────────────────────
 let _preset       = 'medium';  // 'low' | 'medium' | 'high'
@@ -48,8 +49,14 @@ export async function initCompressOptions(file) {
 
   let scan = null;
   try {
-    scan = await _scanFile(file);
-  } catch {
+    scan = await runPrescan(file);
+  } catch (err) {
+    if (err.message === 'ENCRYPTED') {
+      showToast('⚠️ File is password-protected. Please unlock it first.', 6000);
+      container.style.display = 'none';
+      container.innerHTML = '';
+      return;
+    }
     // Не смогли просканировать — показываем UI без scan-данных
   }
 
@@ -145,39 +152,6 @@ export function renderCompressionReport(data) {
     const fill = div.querySelector('.compress-report__gauge-fill');
     if (fill) fill.style.width = fill.dataset.target + '%';
   }));
-}
-
-// ── Pre-scan ──────────────────────────────────────────────────
-// Использует window.PDFLib (загружен в main thread для splitUI).
-// Читаем только структуру — не декомпрессируем контент.
-// Для 50 МБ файла это занимает ~200-500ms — приемлемо.
-
-async function _scanFile(file) {
-  return new Promise(async (resolve, reject) => {
-    const worker = new Worker('./js/worker.js');
-    worker.onmessage = (e) => {
-      if (e.data.type === 'done') {
-        resolve(e.data.result);
-        worker.terminate();
-      } else if (e.data.type === 'error') {
-        reject(new Error(e.data.message));
-        worker.terminate();
-      }
-    };
-    worker.onerror = (e) => {
-      reject(new Error(e.message || 'Worker error'));
-      worker.terminate();
-    };
-
-    try {
-      const buf = await file.arrayBuffer();
-      // Transfer the one-off buffer to avoid cloning
-      worker.postMessage({ tool: 'prescan', file: buf }, [buf]);
-    } catch (err) {
-      reject(err);
-      worker.terminate();
-    }
-  });
 }
 
 // ── Render ─────────────────────────────────────────────────────

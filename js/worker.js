@@ -9,6 +9,7 @@
 
 importScripts('vendor/pdf-lib.min.js');
 importScripts('vendor/pdf.min.js');
+importScripts('vendor/jszip.min.js');
 
 // Initialize pdf.js in worker
 if (self.pdfjsLib) {
@@ -51,7 +52,13 @@ self.onmessage = async function (e) {
         throw new Error('Unknown tool: ' + tool);
     }
   } catch (err) {
-    self.postMessage({ type: 'error', message: err.message });
+    const msg = err.message || String(err);
+    // Transform pdf-lib encryption errors into a specific code we can handle in the UI
+    if (msg.toLowerCase().includes('encrypted') || msg.toLowerCase().includes('password')) {
+      self.postMessage({ type: 'error', message: 'ENCRYPTED' });
+    } else {
+      self.postMessage({ type: 'error', message: msg });
+    }
   }
 };
 
@@ -90,11 +97,10 @@ async function pdfPipeline(buffer, opts, transform) {
     saveLabel        = 'Saving…',
     saveValue        = 90,
     objectStreams     = true,
-    ignoreEncryption = true,
   } = opts;
 
   progress(5, loadLabel);
-  const pdf   = await PDFDocument.load(buffer, { ignoreEncryption });
+  const pdf   = await PDFDocument.load(buffer);  // ignoreEncryption is intentionally omitted for privacy
   const pages = pdf.getPages();
 
   await transform(pdf, pages);
@@ -157,7 +163,7 @@ async function handleMerge(files) {
 
     let pdf;
     try {
-      pdf = await PDFDocument.load(files[i], { ignoreEncryption: true });
+      pdf = await PDFDocument.load(files[i]);
     } catch (err) {
       fileErrors.push({
         index:   i + 1,
@@ -207,7 +213,7 @@ async function handleMerge(files) {
 // ── Split handler ──
 async function handleSplit(fileBuffer, options) {
   const { PDFDocument } = PDFLib;
-  const srcDoc = await PDFDocument.load(fileBuffer, { ignoreEncryption: true });
+  const srcDoc = await PDFDocument.load(fileBuffer);
   const pageCount = srcDoc.getPageCount();
 
   // Фильтруем страницы которые реально существуют в документе
@@ -233,31 +239,23 @@ async function handleSplit(fileBuffer, options) {
     );
 
   } else {
-    // Режим: каждая страница → отдельный PDF
-    const results = [];
+    // Mode: each page -> individual PDF
+    const items = [];
     for (let i = 0; i < pages.length; i++) {
       const pageNum = pages[i];
       const newDoc  = await PDFDocument.create();
       const [p]     = await newDoc.copyPages(srcDoc, [pageNum - 1]);
       newDoc.addPage(p);
       const bytes = await newDoc.save();
-      results.push({ name: `page_${pageNum}.pdf`, buffer: bytes.buffer });
-      self.postMessage({
-        type:  'progress',
-        value: 10 + Math.round(((i + 1) / pages.length) * 80),
-        label: `Page ${i + 1} of ${pages.length}...`,
-      });
+      items.push({ name: `page_${pageNum}.pdf`, buffer: bytes.buffer });
+      
+      progress(10 + Math.round(((i + 1) / pages.length) * 80), `Page ${i + 1} of ${pages.length}...`);
     }
-    // ⚠️  TRANSFERABLE OWNERSHIP: results[*].buffer are transferred to the main
-    //     thread zero-copy. After this postMessage call the buffers are DETACHED
-    //     inside the worker — any access to them here will throw TypeError.
-    //     The receiver (processor.js _runSplit) must use each buffer exactly once
-    //     (pass to JSZip or Blob) and then discard it. Do NOT cache data.result
-    //     for reuse; the ArrayBuffers will be zero-byteLength detached objects.
-    const transferables = results.map(r => r.buffer);
+
+    const zipBuffer = await createZip(items);
     self.postMessage(
-      { type: 'done', result: results, mode: 'separate', totalPages: results.length },
-      transferables
+      { type: 'done', result: zipBuffer, mode: 'zip', totalPages: items.length },
+      [zipBuffer]
     );
   }
 }
@@ -279,7 +277,7 @@ async function handleCompress(fileBuffer, options) {
 
   self.postMessage({ type: 'progress', value: 5,  label: 'Loading PDF…' });
 
-  const pdf = await PDFDocument.load(fileBuffer, { ignoreEncryption: true });
+  const pdf = await PDFDocument.load(fileBuffer);
   const wasEncrypted = pdf.isEncrypted;
 
   self.postMessage({ type: 'progress', value: 18, label: 'Analyzing structure…' });
@@ -757,21 +755,40 @@ async function handlePdf2Jpg(originalBuffer, options) {
     throw new Error('No pages were rendered successfully');
   }
 
-  // Transfer buffers back to main thread
-  const resultBuffers = results.map(r => r.buffer);
-  self.postMessage({
-    type: 'done',
-    result: results,
-    format,
-    zip,
-    successCount
-  }, resultBuffers);
+  if (zip) {
+    self.postMessage({ type: 'progress', value: 95, label: 'Creating ZIP…' });
+    const zipBuffer = await createZip(results);
+    self.postMessage({
+      type: 'done',
+      result: zipBuffer,
+      format,
+      zip: true,
+      successCount
+    }, [zipBuffer]);
+  } else {
+    self.postMessage({
+      type: 'done',
+      result: results,
+      format,
+      zip: false,
+      successCount
+    }, results.map(r => r.buffer));
+  }
 }
 
 // ── Prescan handler ───────────────────────────────────────────
 async function handlePrescan(fileBuffer) {
   const { PDFDocument, PDFName } = PDFLib;
-  const pdf = await PDFDocument.load(fileBuffer, { ignoreEncryption: true });
+  let pdf;
+  try {
+    pdf = await PDFDocument.load(fileBuffer);
+  } catch (err) {
+    const msg = err.message || '';
+    if (msg.toLowerCase().includes('encrypted') || msg.toLowerCase().includes('password')) {
+      throw new Error('ENCRYPTED');
+    }
+    throw err;
+  }
 
   const cat = pdf.catalog;
   const hasXMP       = cat.has(PDFName.of('Metadata'));
@@ -789,6 +806,12 @@ async function handlePrescan(fileBuffer) {
   if (hasXMP)                              opportunities++;
   if (thumbCount > 0)                      opportunities++;
   if (hasPieceInfo || pageHasPieceInfo)    opportunities++;
+  
+  // Safe extraction helper
+  const _safe = (v) => {
+    if (v === undefined || v === null) return '';
+    return String(v);
+  };
 
   const result = {
     pageCount:    pdf.getPageCount(),
@@ -798,7 +821,29 @@ async function handlePrescan(fileBuffer) {
     isEncrypted,
     opportunities,
     fileSize: fileBuffer.byteLength,
+    metadata: {
+      title:    _safe(pdf.getTitle()),
+      author:   _safe(pdf.getAuthor()),
+      subject:  _safe(pdf.getSubject()),
+      keywords: _safe(Array.isArray(pdf.getKeywords()) ? pdf.getKeywords().join(', ') : pdf.getKeywords()),
+      creator:  _safe(pdf.getCreator()),
+      producer: _safe(pdf.getProducer())
+    }
   };
 
   self.postMessage({ type: 'done', result });
+}
+
+// ── Zip helper ──────────────────────────────────────────────────
+/**
+ * Создаёт ZIP из массива файлов и возвращает Buffer
+ * @param {Array<{name: string, buffer: ArrayBuffer}>} items
+ * @returns {Promise<ArrayBuffer>}
+ */
+async function createZip(items) {
+  const zip = new JSZip();
+  items.forEach(it => {
+    zip.file(it.name, it.buffer);
+  });
+  return await zip.generateAsync({ type: 'arraybuffer', compression: 'DEFLATE' });
 }
