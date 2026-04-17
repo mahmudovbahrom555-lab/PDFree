@@ -40,21 +40,26 @@ export async function initMetaOptions(file) {
   container.style.display = 'block';
 
   try {
-    const { PDFDocument } = window.PDFLib;
-    const buf = await file.arrayBuffer();
-    const pdf = await PDFDocument.load(buf, { ignoreEncryption: true });
-
-    _meta = {
-      title:    _safe(pdf.getTitle()),
-      author:   _safe(pdf.getAuthor()),
-      subject:  _safe(pdf.getSubject()),
-      keywords: _safe(Array.isArray(pdf.getKeywords())
-                        ? pdf.getKeywords().join(', ')
-                        : pdf.getKeywords()),
-      creator:  _safe(pdf.getCreator()),
-      producer: _safe(pdf.getProducer()),
-    };
-  } catch {
+    const scan = await runPrescan(file);
+    if (scan.metadata) {
+      _meta = {
+        title:    scan.metadata.title    || '',
+        author:   scan.metadata.author   || '',
+        subject:  scan.metadata.subject  || '',
+        keywords: scan.metadata.keywords || '',
+        creator:  scan.metadata.creator  || '',
+        producer: scan.metadata.producer || '',
+      };
+    } else {
+      throw new Error('No metadata returned');
+    }
+  } catch (err) {
+    if (err.message === 'ENCRYPTED') {
+      showToast('⚠️ File is password-protected. Please unlock it first.', 6000);
+      container.style.display = 'none';
+      container.innerHTML = '';
+      return;
+    }
     _meta = { title: '', author: '', subject: '', keywords: '', creator: '', producer: '' };
     showToast('Could not read metadata — editing from scratch', 4000);
   }

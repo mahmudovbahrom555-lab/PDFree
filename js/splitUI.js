@@ -15,6 +15,7 @@ import { showToast } from './ui.js';
 import { parseRange as _parseRangeUtil, pagesToRangeString,
          renderCheckboxes as _renderCheckboxesUtil,
          renderRangeInput as _renderRangeInputUtil } from './pageSelectorUtils.js';
+import { runPrescan } from './processor.js';
 
 // ── State ──────────────────────────────────────────────────────
 let _pageCount    = 0;
@@ -39,11 +40,8 @@ export async function initSplitOptions(file) {
   container.style.display = 'block';
 
   try {
-    // pdf-lib доступен как глобальная переменная через CDN скрипт в index.html
-    const { PDFDocument } = window.PDFLib;
-    const buf  = await file.arrayBuffer();
-    const doc  = await PDFDocument.load(buf, { ignoreEncryption: true });
-    _pageCount = doc.getPageCount();
+    const scan = await runPrescan(file);
+    _pageCount = scan.pageCount;
 
     if (_pageCount === 0) {
       showToast('This PDF has no pages');
@@ -62,7 +60,11 @@ export async function initSplitOptions(file) {
 
     _render();
   } catch (err) {
-    showToast('Could not read PDF pages: ' + err.message);
+    if (err.message === 'ENCRYPTED') {
+      showToast('⚠️ File is password-protected. Please unlock it first.', 6000);
+    } else {
+      showToast('Could not read PDF pages: ' + err.message);
+    }
     container.style.display = 'none';
   }
 }

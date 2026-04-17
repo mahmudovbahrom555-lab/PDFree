@@ -67,16 +67,18 @@ export function addFiles(files) {
 
   files.forEach(f => {
     // п.5: валидация MIME / расширения
-    if (!isFileAccepted(f, _currentAccept, ACCEPTED_MIME)) {
+    // Protection: file size limit (50 MB) to prevent DoS/memory crashes
+    if (f.size > 50 * 1024 * 1024) {
       invalid++;
       return;
     }
+
     const isDupe = selectedFiles.some(x => x.name === f.name && x.size === f.size);
     if (!isDupe) selectedFiles.push(f);
     else dupes++;
   });
 
-  if (invalid > 0) showToast(`${invalid} file${invalid > 1 ? 's' : ''} skipped — wrong format`);
+  if (invalid > 0) showToast(`${invalid} file${invalid > 1 ? 's' : ''} skipped — too large or wrong format`);
   if (dupes   > 0) showToast(`${dupes} duplicate${dupes > 1 ? 's' : ''} skipped`);
 
   if (selectedFiles.length > 0) {
@@ -114,19 +116,44 @@ export function renderList() {
   selectedFiles.forEach((f, i) => {
     const el = document.createElement('div');
     el.className = 'file-item';
-    // п.6: drag разрешён только когда не идёт обработка
-    el.draggable  = _currentTool === 'merge' && !_locked;
-    el.dataset.i  = i;
+    el.draggable = _currentTool === 'merge' && !_locked;
+    el.dataset.i = i;
 
-    el.innerHTML = `
-      <span style="font-size:16px;flex-shrink:0">📄</span>
-      <span class="file-item-num">${i + 1}</span>
-      <span class="file-item-name" title="${esc(f.name)}">${esc(f.name)}</span>
-      <span class="file-item-size">${fmtSize(f.size)}</span>
-      <button class="file-item-del" data-i="${i}" aria-label="Remove ${esc(f.name)}" ${_locked ? 'disabled aria-disabled="true"' : ''}>×</button>
-    `;
+    // Icon
+    const icon = document.createElement('span');
+    icon.style.cssText = 'font-size:16px;flex-shrink:0';
+    icon.textContent = '📄';
 
-    // п.6: drag-обработчики добавляем только когда не заблокировано
+    // Index
+    const num = document.createElement('span');
+    num.className = 'file-item-num';
+    num.textContent = i + 1;
+
+    // Name (Safe textContent)
+    const name = document.createElement('span');
+    name.className = 'file-item-name';
+    name.title = f.name;
+    name.textContent = f.name;
+
+    // Size
+    const size = document.createElement('span');
+    size.className = 'file-item-size';
+    size.textContent = fmtSize(f.size);
+
+    // Delete Button
+    const del = document.createElement('button');
+    del.className = 'file-item-del';
+    del.dataset.i = i;
+    del.setAttribute('aria-label', `Remove ${f.name}`);
+    del.textContent = '×';
+    if (_locked) {
+      del.disabled = true;
+      del.setAttribute('aria-disabled', 'true');
+    }
+
+    el.append(icon, num, name, size, del);
+
+    // Drag events
     if (_currentTool === 'merge' && !_locked) {
       el.addEventListener('dragstart', _onDragStart);
       el.addEventListener('dragover',  _onDragOver);
@@ -137,7 +164,7 @@ export function renderList() {
     list.appendChild(el);
   });
 
-  // Делегирование клика на кнопки удаления
+  // Click delegation for deletion
   list.onclick = e => {
     if (_locked) return;
     const btn = e.target.closest('.file-item-del');

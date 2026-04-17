@@ -3,7 +3,7 @@
 
 // ============================================================
 //  processor.js — PDF processing via Web Worker
-// ============================================================
+// ============================================
 
 import { fmtSize } from './utils.js';
 import { setProgress, hideProgress, setButtonProcessing, setButtonReady,
@@ -17,6 +17,33 @@ export let isProcessing = false;
 
 function _createWorker() {
   return new Worker('./js/worker.js');
+}
+
+export async function runPrescan(file) {
+  return new Promise(async (resolve, reject) => {
+    const worker = _createWorker();
+    worker.onmessage = (e) => {
+      if (e.data.type === 'done') {
+        resolve(e.data.result);
+        worker.terminate();
+      } else if (e.data.type === 'error') {
+        reject(new Error(e.data.message || e.data.error));
+        worker.terminate();
+      }
+    };
+    worker.onerror = (e) => {
+      reject(new Error(e.message || 'Worker error'));
+      worker.terminate();
+    };
+    try {
+      const buf = await file.arrayBuffer();
+      // Transfer to avoid cloning memory overhead
+      worker.postMessage({ tool: 'prescan', file: buf }, [buf]);
+    } catch (err) {
+      reject(err);
+      worker.terminate();
+    }
+  });
 }
 
 // ── Cancel ────────────────────────────────────────────────────
@@ -46,11 +73,6 @@ export async function doProcess(currentTool, extraParams = {}) {
   setProgress(5, 'Reading files...');
   showCancelBtn();
 
-  // ── Runner dispatch ────────────────────────────────────────────
-  // Registry maps each tool to a runner key (e.g. 'merge', 'worker').
-  // This map resolves runner key → _run* function — O(1), no if-else.
-  // Adding a new runner type: add one entry here + one _run* function.
-  // Adding a new tool that uses an existing runner: only toolRegistrations.js.
   const runnerMap = {
     merge:    () => _runMerge(filesSnapshot),
     split:    () => _runSplit(filesSnapshot, extraParams),
@@ -78,6 +100,21 @@ function _finalize() {
   hideCancelBtn();
 }
 
+/**
+ * Common handler for results that might be large and shouldn't block UI
+ * @param {string} tool - Tool name
+ * @param {Blob} blob - Final artifact
+ * @param {string} desc - Success description
+ * @param {string} filename - Download filename
+ */
+function _dispatchSuccess(tool, blob, desc, filename) {
+  _finalize();
+  setProgress(100, 'Done!');
+  document.dispatchEvent(new CustomEvent('pdfree:success', {
+    detail: { tool, blob, desc, filename }
+  }));
+}
+
 // ── Merge ──────────────────────────────────────────────────────
 
 async function _runMerge(filesSnapshot) {
@@ -89,39 +126,18 @@ async function _runMerge(filesSnapshot) {
     if (data.type === 'progress') {
       setProgress(data.value, data.label);
     } else if (data.type === 'done') {
-      _finalize();
-      setProgress(100, 'Done!');
       const blob = new Blob([data.result], { type: 'application/pdf' });
-
-      // Reflect partial success in the description when some files were skipped
       const mergedCount  = data.mergedCount ?? filesSnapshot.length;
       const skippedCount = filesSnapshot.length - mergedCount;
       const desc = skippedCount > 0
         ? `Merged ${mergedCount} of ${filesSnapshot.length} files · ${data.totalPages} pages · ${fmtSize(blob.size)}`
         : `Merged ${filesSnapshot.length} files · ${data.totalPages} pages · ${fmtSize(blob.size)}`;
 
-      document.dispatchEvent(new CustomEvent('pdfree:success', {
-        detail: { tool: 'merge', blob, desc, filename: 'merged_document.pdf' }
-      }));
+      _dispatchSuccess('merge', blob, desc, 'merged.pdf');
 
-      // Consolidated toast for skipped files — one message beats five individual ones.
-      // Cap at 5 entries: 90 error labels in one toast is unreadable.
       if (data.fileErrors?.length > 0) {
-        const MAX_SHOWN  = 5;
-        const shown      = data.fileErrors.slice(0, MAX_SHOWN);
-        const overflow   = data.fileErrors.length - shown.length;
-        const labels     = shown.map(e => {
-          const hint = e.code === 'ENCRYPTED' ? ' (password-protected)'
-                     : e.code === 'CORRUPT'   ? ' (corrupted)'
-                     :                          '';
-          // Use filename when available (added in v14+), fall back to position
-          return (e.name ?? `#${e.index}`) + hint;
-        });
-        if (overflow > 0) labels.push(`+${overflow} more`);
-        showToast(
-          `⚠️ ${data.fileErrors.length} file${data.fileErrors.length > 1 ? 's' : ''} skipped: ${labels.join(', ')}`,
-          7000
-        );
+        const labels = data.fileErrors.slice(0, 5).map(e => (e.name ?? `#${e.index}`) + (e.code === 'ENCRYPTED' ? ' (encrypted)' : ''));
+        showToast(`⚠️ Skipped: ${labels.join(', ')}`, 7000);
       }
     } else if (data.type === 'error') {
       _finalize();
@@ -132,9 +148,6 @@ async function _runMerge(filesSnapshot) {
     _finalize();
     _handleError('merge', e.message || 'Worker error');
   };
-
-  // ⚠️  TRANSFERABLE: all buffers in `buffers` are transferred to the worker.
-  //     They are DETACHED here immediately after postMessage — do not read them.
   _worker.postMessage({ tool: 'merge', files: buffers }, buffers);
 }
 
@@ -149,46 +162,14 @@ async function _runSplit(filesSnapshot, { pages, mode }) {
     if (data.type === 'progress') {
       setProgress(data.value, data.label);
     } else if (data.type === 'done') {
-      setProgress(95, 'Packaging...');
-      try {
-        let blob, desc, filename;
+      const isZip = data.mode === 'zip';
+      const blob  = new Blob([data.result], { type: isZip ? 'application/zip' : 'application/pdf' });
+      const name  = isZip ? 'split_pages.zip' : 'extracted.pdf';
+      const desc  = isZip 
+        ? `Split into ${data.totalPages} files (ZIP) · ${fmtSize(blob.size)}`
+        : `Extracted ${data.totalPages} pages · ${fmtSize(blob.size)}`;
 
-        if (data.mode === 'single') {
-          // Один PDF
-          blob     = new Blob([data.result], { type: 'application/pdf' });
-          desc     = `Extracted ${data.totalPages} page${data.totalPages > 1 ? 's' : ''} · ${fmtSize(blob.size)}`;
-          filename = 'extracted.pdf';
-        } else {
-          // Несколько PDF → ZIP через JSZip (глобальная переменная из CDN)
-          const JSZip = window.JSZip;
-          if (!JSZip) throw new Error('JSZip not loaded');
-          const zip = new JSZip();
-          setProgress(96, 'Building ZIP...');
-          // ⚠️  item.buffer is a transferred (detached) ArrayBuffer received from
-          //     the worker. JSZip.file() consumes it here — do not use item.buffer
-          //     again after this loop. Accessing a detached ArrayBuffer returns
-          //     byteLength=0 and reads return 0s, silently corrupting output.
-          for (const item of data.result) {
-            zip.file(item.name, item.buffer);
-          }
-          setProgress(97, 'Compressing...');
-          blob     = await zip.generateAsync(
-            { type: 'blob', compression: 'DEFLATE' },
-            meta  => setProgress(97 + Math.round(meta.percent / 100 * 2), 'Compressing...')
-          );
-          desc     = `Split into ${data.totalPages} file${data.totalPages > 1 ? 's' : ''} · ${fmtSize(blob.size)}`;
-          filename = 'split_pages.zip';
-        }
-
-        _finalize();
-        setProgress(100, 'Done!');
-        document.dispatchEvent(new CustomEvent('pdfree:success', {
-          detail: { tool: 'split', blob, desc, filename }
-        }));
-      } catch (err) {
-        _finalize();
-        _handleError('split', err.message);
-      }
+      _dispatchSuccess('split', blob, desc, name);
     } else if (data.type === 'error') {
       _finalize();
       _handleError('split', data.message);
@@ -198,13 +179,6 @@ async function _runSplit(filesSnapshot, { pages, mode }) {
     _finalize();
     _handleError('split', e.message || 'Worker error');
   };
-
-  // ⚠️  TRANSFERABLE CONTRACT: `buffer` was passed to worker as a Transferable.
-  //     It is now DETACHED here in the main thread — do not read it after this line.
-  //     The worker owns it until it sends `done`, at which point data.result
-  //     (single mode) or data.result[*].buffer (separate mode) are transferred
-  //     back and become the new owners. Each buffer must be consumed exactly once
-  //     (Blob constructor, JSZip.file()) and never stored for later reuse.
   _worker.postMessage({ tool: 'split', file: buffer, options: { pages, mode } }, [buffer]);
 }
 
@@ -220,70 +194,24 @@ async function _runCompress(filesSnapshot, { preset = 'medium', preserveText = t
     if (data.type === 'progress') {
       setProgress(data.value, data.label);
     } else if (data.type === 'done') {
-      _finalize();
-      setProgress(100, 'Done!');
-
-      // Guard: worker must return an ArrayBuffer. Any other type means
-      // something went wrong in serialisation (detached buffer, wrong transfer, etc.)
-      if (!(data.result instanceof ArrayBuffer)) {
-        _handleError('compress', 'Unexpected result type from worker');
-        return;
-      }
-
       const blob = new Blob([data.result], { type: 'application/pdf' });
-
-      // Build filename: "report.pdf" → "report-compressed.pdf"
-      const baseName = file.name.replace(/\.pdf$/i, '');
-      const filename  = `${baseName}-compressed.pdf`;
-
-      const savedPct  = data.originalSize > 0
-        ? Math.round((data.savedBytes / data.originalSize) * 100)
-        : 0;
+      const savedPct  = data.originalSize > 0 ? Math.round((data.savedBytes / data.originalSize) * 100) : 0;
       const desc = savedPct > 0
         ? `${fmtSize(data.originalSize)} → ${fmtSize(data.compressedSize)} · saved ${savedPct}%`
-        : `${fmtSize(blob.size)} · file was already optimized`;
+        : `${fmtSize(blob.size)} · file already optimized`;
 
-      document.dispatchEvent(new CustomEvent('pdfree:success', {
-        detail: {
-          tool: 'compress',
-          blob,
-          desc,
-          filename,
-          // Extra data for compression report UI (beyond standard ТЗ)
-          compressionReport: {
-            originalSize:   data.originalSize,
-            compressedSize: data.compressedSize,
-            savedBytes:     data.savedBytes,
-            report:         data.report,
-          },
-        }
-      }));
-
-      if (data.report?.wasEncrypted) {
-        showToast('⚠️ Encrypted PDF was processed with limitations', 5000);
-      }
+      _dispatchSuccess('compress', blob, desc, file.name.replace('.pdf', '-compressed.pdf'));
     } else if (data.type === 'error') {
       _finalize();
       _handleError('compress', data.message);
     }
   };
-
-  _worker.onerror = (e) => {
-    _finalize();
-    _handleError('compress', e.message || 'Worker error');
-  };
-
-  // ⚠️  TRANSFERABLE: buffer detached after this call — worker owns it until done.
-  _worker.postMessage(
-    { tool: 'compress', file: buffer, options: { preset, preserveText } },
-    [buffer]
-  );
+  _worker.postMessage({ tool: 'compress', file: buffer, options: { preset, preserveText } }, [buffer]);
 }
 
 // ── JPG → PDF ──────────────────────────────────────────────────
 
 async function _runJpg2Pdf(filesSnapshot, params) {
-  // Read all images as ArrayBuffers and transfer to worker
   const buffers = await Promise.all(filesSnapshot.map(f => f.arrayBuffer()));
   setProgress(5, 'Loading images…');
 
@@ -292,206 +220,62 @@ async function _runJpg2Pdf(filesSnapshot, params) {
     if (data.type === 'progress') {
       setProgress(data.value, data.label);
     } else if (data.type === 'done') {
-      if (!(data.result instanceof ArrayBuffer)) {
-        _handleError('jpg2pdf', 'Unexpected result from worker'); return;
-      }
-      _finalize();
-      setProgress(100, 'Done!');
-
-      const blob     = new Blob([data.result], { type: 'application/pdf' });
-      const baseName = filesSnapshot.length === 1
-        ? filesSnapshot[0].name.replace(/\.[^.]+$/, '')
-        : 'converted';
-      const filename = `${baseName}.pdf`;
-      const desc     = `${data.pageCount} page${data.pageCount !== 1 ? 's' : ''} · ${filesSnapshot.length} image${filesSnapshot.length !== 1 ? 's' : ''} · ${fmtSize(blob.size)}`;
-
-      // Warn user about any images that couldn't be processed
-      if (data.skipped?.length > 0) {
-        const nums = data.skipped.join(', ');
-        showToast(`⚠️ ${data.skipped.length} image${data.skipped.length > 1 ? 's' : ''} skipped (could not decode): #${nums}`, 6000);
-      }
-
-      document.dispatchEvent(new CustomEvent('pdfree:success', {
-        detail: { tool: 'jpg2pdf', blob, desc, filename }
-      }));
+      const blob = new Blob([data.result], { type: 'application/pdf' });
+      const desc = `${data.pageCount} pages from ${filesSnapshot.length} images · ${fmtSize(blob.size)}`;
+      _dispatchSuccess('jpg2pdf', blob, desc, 'converted.pdf');
     } else if (data.type === 'error') {
       _finalize();
       _handleError('jpg2pdf', data.message);
     }
   };
-  _worker.onerror = (e) => {
-    _finalize();
-    _handleError('jpg2pdf', e.message || 'Worker error');
-  };
-
-  _worker.postMessage(
-    { tool: 'jpg2pdf', files: buffers, options: params },
-    buffers   // All buffers as Transferables (zero-copy)
-  );
+  _worker.postMessage({ tool: 'jpg2pdf', files: buffers, options: params }, buffers);
 }
 
 // ── PDF → JPG ──────────────────────────────────────────────────
-// Рендеринг требует DOM (canvas), поэтому работаем в главном потоке.
-
-// Time-budget yield helper.
-// Why time-based instead of page-count threshold:
-//   A threshold like "yield every 10 pages" assumes pages take equal time.
-//   A 300-DPI A0 poster takes 40× longer than a 72-DPI thumbnail.
-//   Time-based control answers the actual question: "have I blocked the
-//   UI thread for too long?" regardless of what caused the delay.
-//
-// Why 16ms budget (≈ one 60 FPS frame):
-//   If we've been running for >16ms, the browser has already missed a
-//   frame. Yielding now lets it paint, handle input, and schedule the
-//   next frame before we continue. Yielding more often is wasteful;
-//   less often causes visible jank on slow pages.
-//
-// rIC vs setTimeout(0):
-//   setTimeout(0) always yields — correct for the busy case.
-//   rIC with { timeout: 50 } yields at idle — better for the quiet case
-//   (tab in background, no user interaction), prevents unnecessary 50ms
-//   stalls on fast single-page exports.
-//   We use rIC when available; Safari/Firefox fallback to setTimeout(0).
-function _yieldToUI() {
-  if (typeof requestIdleCallback === 'function') {
-    return new Promise(r => requestIdleCallback(r, { timeout: 50 }));
-  }
-  return new Promise(r => setTimeout(r, 0));
-}
-
-const _FRAME_BUDGET_MS = 16;   // ≈ one 60 FPS frame
 
 async function _runPdf2Jpg(filesSnapshot, params) {
   const file   = filesSnapshot[0];
   const buffer = await file.arrayBuffer();
   setProgress(5, 'Loading PDF…');
 
-  _worker.onmessage = async (e) => {
+  _worker.onmessage = (e) => {
     const data = e.data;
     if (data.type === 'progress') {
       setProgress(data.value, data.label);
     } else if (data.type === 'done') {
-      _finalize();
-      setProgress(100, 'Done!');
-
-      const { result, format, zip, successCount } = data;
-      const ext = format === 'png' ? 'PNG' : 'JPG';
-
-      let finalBlob, finalFilename, finalDesc;
-
-      if (!zip || result.length === 1) {
-        // Individual image (Blob)
-        const item = result[0];
-        finalBlob     = new Blob([item.buffer], { type: format === 'png' ? 'image/png' : 'image/jpeg' });
-        const base    = file.name.replace(/\.pdf$/i, '');
-        finalFilename = item.name.replace('page', base + '-page');
-        finalDesc     = `1 page · ${ext} · ${fmtSize(finalBlob.size)}`;
-      } else {
-        // Multi-page ZIP
-        const JSZip = window.JSZip;
-        if (!JSZip) { _handleError('pdf2jpg', 'JSZip not loaded'); return; }
-        const zipObj = new JSZip();
-        const base   = file.name.replace(/\.pdf$/i, '');
-        
-        for (const item of result) {
-          zipObj.file(item.name.replace('page', base + '-page'), item.buffer);
-        }
-        
-        setProgress(95, 'Packaging ZIP…');
-        finalBlob = await zipObj.generateAsync({ type: 'blob', compression: 'STORE' });
-        finalFilename = `${base}-images.zip`;
-        finalDesc     = `${successCount} ${ext} images · ${fmtSize(finalBlob.size)}`;
-      }
-
-      document.dispatchEvent(new CustomEvent('pdfree:success', {
-        detail: { tool: 'pdf2jpg', blob: finalBlob, desc: finalDesc, filename: finalFilename }
-      }));
+      const isZip = !!data.zip;
+      const blob  = new Blob([data.result], { type: isZip ? 'application/zip' : (data.format === 'png' ? 'image/png' : 'image/jpeg') });
+      const name  = isZip ? 'images.zip' : `page.${data.format}`;
+      const desc  = isZip ? `${data.successCount} images (ZIP) · ${fmtSize(blob.size)}` : `1 page (${data.format}) · ${fmtSize(blob.size)}`;
+      _dispatchSuccess('pdf2jpg', blob, desc, name);
     } else if (data.type === 'error') {
       _finalize();
       _handleError('pdf2jpg', data.message);
     }
   };
-
-  _worker.onerror = (e) => {
-    _finalize();
-    _handleError('pdf2jpg', e.message || 'Worker error');
-  };
-
-  // ⚠️  TRANSFERABLE: buffer detached after this call.
-  _worker.postMessage(
-    { tool: 'pdf2jpg', file: buffer, options: params },
-    [buffer]
-  );
+  _worker.postMessage({ tool: 'pdf2jpg', file: buffer, options: params }, [buffer]);
 }
 
-// ── Generic single-file worker tool ───────────────────────────
-// Используется для watermark, pagenum, meta — все следуют одному
-// паттерну: один файл → worker → ArrayBuffer → Blob → success.
+// ── Generic Tool ──────────────────────────────────────────────
 
 async function _runWorkerTool(tool, filesSnapshot, params) {
   const file   = filesSnapshot[0];
   const buffer = await file.arrayBuffer();
-
-  const labelMap = {
-    watermark: 'Applying watermark…',
-    pagenum:   'Adding page numbers…',
-    meta:      'Updating metadata…',
-  };
-  setProgress(5, labelMap[tool] || 'Processing…');
+  setProgress(5, 'Processing…');
 
   _worker.onmessage = (e) => {
     const data = e.data;
     if (data.type === 'progress') {
       setProgress(data.value, data.label);
     } else if (data.type === 'done') {
-      if (!(data.result instanceof ArrayBuffer)) {
-        _handleError(tool, 'Unexpected result from worker'); return;
-      }
-      _finalize();
-      setProgress(100, 'Done!');
-
       const blob = new Blob([data.result], { type: 'application/pdf' });
-      const base = file.name.replace(/\.pdf$/i, '');
-      const suffixes = { watermark: '-watermarked', pagenum: '-numbered', meta: '-edited' };
-      const filename = `${base}${suffixes[tool] || '-processed'}.pdf`;
-
-      const descMap = {
-        watermark: `Watermarked · ${data.pageCount} pages · ${fmtSize(blob.size)}`,
-        pagenum:   `Page numbers added · ${data.pageCount} pages · ${fmtSize(blob.size)}`,
-        meta:      `Metadata updated · ${data.pageCount} pages · ${fmtSize(blob.size)}`,
-      };
-
-      document.dispatchEvent(new CustomEvent('pdfree:success', {
-        detail: { tool, blob, desc: descMap[tool] || fmtSize(blob.size), filename }
-      }));
+      _dispatchSuccess(tool, blob, fmtSize(blob.size), file.name.replace('.pdf', '-processed.pdf'));
     } else if (data.type === 'error') {
       _finalize();
       _handleError(tool, data.message);
     }
   };
-
-  _worker.onerror = (e) => {
-    _finalize();
-    _handleError(tool, e.message || 'Worker error');
-  };
-
-  // ⚠️  TRANSFERABLE: buffer detached after this call — worker owns it until done.
-  _worker.postMessage(
-    { tool, file: buffer, options: params },
-    [buffer]
-  );
-}
-
-// ── Stub ──────────────────────────────────────────────────────
-
-async function _runStub(tool) {
-  const msg = TOOLS[tool]?.comingSoon || '🚧 This tool is coming soon!';
-  await new Promise(r => setTimeout(r, 400));
-  if (!isProcessing) return;
-  _finalize();
-  hideProgress();
-  setButtonReady(TOOLS[tool].btn);
-  showToast(msg, 5000);
+  _worker.postMessage({ tool, file: buffer, options: params }, [buffer]);
 }
 
 // ── Error ──────────────────────────────────────────────────────
@@ -499,5 +283,14 @@ async function _runStub(tool) {
 function _handleError(tool, message) {
   hideProgress();
   setButtonReady(TOOLS[tool]?.btn || 'Try again');
-  showToast('Error: ' + message, 5000);
+  if (message === 'ENCRYPTED') {
+    showToast('⚠️ File is password-protected. Please unlock it first.', 6000);
+  } else {
+    showToast('Error: ' + message, 5000);
+  }
+}
+
+async function _runStub(tool) {
+  _finalize();
+  showToast(TOOLS[tool]?.comingSoon || '🚧 Coming soon!', 5000);
 }
