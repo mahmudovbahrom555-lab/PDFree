@@ -108,7 +108,7 @@ self.addEventListener('fetch', event => {
   // Same-origin HTML: stale-while-revalidate
   if (url.origin === self.location.origin && (
       request.headers.get('accept')?.includes('text/html') ||
-      url.pathname === '/' ||
+      url.pathname === './' ||
       url.pathname.endsWith('.html')
   )) {
     event.respondWith(staleWhileRevalidate(request));
