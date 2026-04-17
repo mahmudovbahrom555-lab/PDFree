@@ -41,6 +41,42 @@ global.self = {
 };
 global.PDFLib = PDFLib;   // worker.js reads PDFLib from global scope
 
+// ── Mock Browser Image APIs for JPG/PDF ───────────────────────
+if (typeof global.OffscreenCanvas === 'undefined') {
+  global.OffscreenCanvas = class OffscreenCanvas {
+    constructor(w, h) { this.width = w; this.height = h; }
+    getContext() { 
+      return { 
+        save: () => {}, restore: () => {}, 
+        translate: () => {}, rotate: () => {}, 
+        drawImage: () => {} 
+      }; 
+    }
+    convertToBlob() { 
+      // minimal valid stub blob for worker export
+      return Promise.resolve(new Blob([new Uint8Array([0xFF, 0xD8, 0xFF, 0xD9])], { type: 'image/jpeg' }));
+    }
+  };
+}
+if (typeof global.createImageBitmap === 'undefined') {
+  global.createImageBitmap = async () => ({ width: 100, height: 100, close: () => {} });
+}
+if (typeof global.Blob === 'undefined') {
+  const { Blob } = await import('buffer');
+  global.Blob = Blob;
+}
+global.self.pdfjsLib = {
+  getDocument: () => ({
+    promise: Promise.resolve({
+      numPages: 2,
+      getPage: async (n) => ({
+        getViewport: () => ({ width: 500, height: 700 }),
+        render: () => ({ promise: Promise.resolve() })
+      })
+    })
+  })
+};
+
 // ── Load fixtures ─────────────────────────────────────────────
 const FIXTURES = join(__dir, 'fixtures');
 
@@ -281,8 +317,8 @@ if (failed > 0) process.exit(1);
 const workerSrc2 = readFileSync(join(__dir, '../js/worker.js'), 'utf8')
   .replace(/importScripts\([^)]+\);?/g, '')
   .replace(/self\.onmessage\s*=[\s\S]*?^};/m, '');
-const workerModule2 = new AsyncFunction(workerSrc2 + '\nreturn { handleSplit, handleWatermark, handlePageNum, handleMeta };');
-const { handleSplit, handleWatermark, handlePageNum, handleMeta } = await workerModule2();
+const workerModule2 = new AsyncFunction(workerSrc2 + '\nreturn { handleSplit, handleWatermark, handlePageNum, handleMeta, handleJpg2Pdf, handlePdf2Jpg };');
+const { handleSplit, handleWatermark, handlePageNum, handleMeta, handleJpg2Pdf, handlePdf2Jpg } = await workerModule2();
 
 console.log('\n✂️  handleSplit:');
 
@@ -395,6 +431,36 @@ await test('metadata result is smaller or equal after stripping', async () => {
   // Allow +5% headroom for object stream differences
   const result = lastDone().result.byteLength;
   expect(result).toBeLessThan(original * 1.05);
+});
+
+// ══════════════════════════════════════════════════════════════
+// handleJpg2Pdf
+// ══════════════════════════════════════════════════════════════
+
+console.log('\n📸 handleJpg2Pdf:');
+
+await test('jpg2pdf produces valid PDF with mapped dimensions', async () => {
+  await handleJpg2Pdf([normal1()], { pageSize: 'auto', orientation: 'auto', compress: true, quality: 0.8 });
+  const done = lastDone();
+  expect(done).toBeTruthy();
+  expect(done.pageCount).toBe(1);
+  expect(String.fromCharCode(...new Uint8Array(done.result).slice(0, 4))).toBe('%PDF');
+});
+
+// ══════════════════════════════════════════════════════════════
+// handlePdf2Jpg
+// ══════════════════════════════════════════════════════════════
+
+console.log('\n📄 handlePdf2Jpg:');
+
+await test('pdf2jpg resolves with rendered image buffers', async () => {
+  await handlePdf2Jpg(normal1(), { pages: [1, 2], format: 'jpg', dpi: 72, zip: false });
+  const done = lastDone();
+  expect(done).toBeTruthy();
+  expect(done.successCount).toBe(2);
+  expect(done.result.length).toBe(2);
+  expect(done.result[0].name.endsWith('.jpg')).toBeTruthy();
+  expect(done.result[0].buffer instanceof ArrayBuffer).toBeTruthy();
 });
 
 // ══════════════════════════════════════════════════════════════

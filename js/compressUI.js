@@ -153,37 +153,31 @@ export function renderCompressionReport(data) {
 // Для 50 МБ файла это занимает ~200-500ms — приемлемо.
 
 async function _scanFile(file) {
-  const { PDFDocument, PDFName } = window.PDFLib;
-  const buf = await file.arrayBuffer();
-  const pdf = await PDFDocument.load(buf, { ignoreEncryption: true });
+  return new Promise(async (resolve, reject) => {
+    const worker = new Worker('./js/worker.js');
+    worker.onmessage = (e) => {
+      if (e.data.type === 'done') {
+        resolve(e.data.result);
+        worker.terminate();
+      } else if (e.data.type === 'error') {
+        reject(new Error(e.data.message));
+        worker.terminate();
+      }
+    };
+    worker.onerror = (e) => {
+      reject(new Error(e.message || 'Worker error'));
+      worker.terminate();
+    };
 
-  const cat = pdf.catalog;
-  const hasXMP       = cat.has(PDFName.of('Metadata'));
-  const hasPieceInfo = cat.has(PDFName.of('PieceInfo'));
-  const isEncrypted  = pdf.isEncrypted;
-
-  let thumbCount = 0;
-  let pageHasPieceInfo = false;
-  for (const page of pdf.getPages()) {
-    if (page.node.has(PDFName.of('Thumb')))    thumbCount++;
-    if (page.node.has(PDFName.of('PieceInfo'))) pageHasPieceInfo = true;
-  }
-
-  // Сколько opportunities (0 = уже чистый)
-  let opportunities = 0;
-  if (hasXMP)                              opportunities++;
-  if (thumbCount > 0)                      opportunities++;
-  if (hasPieceInfo || pageHasPieceInfo)    opportunities++;
-
-  return {
-    pageCount:    pdf.getPageCount(),
-    hasXMP,
-    hasPieceInfo: hasPieceInfo || pageHasPieceInfo,
-    thumbCount,
-    isEncrypted,
-    opportunities,
-    fileSize: file.size,
-  };
+    try {
+      const buf = await file.arrayBuffer();
+      // Transfer the one-off buffer to avoid cloning
+      worker.postMessage({ tool: 'prescan', file: buf }, [buf]);
+    } catch (err) {
+      reject(err);
+      worker.terminate();
+    }
+  });
 }
 
 // ── Render ─────────────────────────────────────────────────────

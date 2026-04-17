@@ -1731,3 +1731,10 @@
     transform: translateY(0);
   }
 }
+
+/* --- Utility classes for CSP compliance (replaced inline styles) --- */
+.d-none { display: none !important; }
+.ad-slot--leaderboard-ins { display:block; width:728px; height:90px; margin:0 auto; }
+.ad-slot--post-success { opacity:0; transition: opacity 0.3s ease; }
+.text-green { color: var(--green); }
+.footer-note { font-size:11px; margin-top:8px; display:inline-block; color:var(--text3); }

@@ -44,6 +44,9 @@ self.onmessage = async function (e) {
       case 'meta':
         await handleMeta(e.data.file, e.data.options);
         break;
+      case 'prescan':
+        await handlePrescan(e.data.file);
+        break;
       default:
         throw new Error('Unknown tool: ' + tool);
     }
@@ -763,4 +766,39 @@ async function handlePdf2Jpg(originalBuffer, options) {
     zip,
     successCount
   }, resultBuffers);
+}
+
+// ── Prescan handler ───────────────────────────────────────────
+async function handlePrescan(fileBuffer) {
+  const { PDFDocument, PDFName } = PDFLib;
+  const pdf = await PDFDocument.load(fileBuffer, { ignoreEncryption: true });
+
+  const cat = pdf.catalog;
+  const hasXMP       = cat.has(PDFName.of('Metadata'));
+  const hasPieceInfo = cat.has(PDFName.of('PieceInfo'));
+  const isEncrypted  = pdf.isEncrypted;
+
+  let thumbCount = 0;
+  let pageHasPieceInfo = false;
+  for (const page of pdf.getPages()) {
+    if (page.node.has(PDFName.of('Thumb')))    thumbCount++;
+    if (page.node.has(PDFName.of('PieceInfo'))) pageHasPieceInfo = true;
+  }
+
+  let opportunities = 0;
+  if (hasXMP)                              opportunities++;
+  if (thumbCount > 0)                      opportunities++;
+  if (hasPieceInfo || pageHasPieceInfo)    opportunities++;
+
+  const result = {
+    pageCount:    pdf.getPageCount(),
+    hasXMP,
+    hasPieceInfo: hasPieceInfo || pageHasPieceInfo,
+    thumbCount,
+    isEncrypted,
+    opportunities,
+    fileSize: fileBuffer.byteLength,
+  };
+
+  self.postMessage({ type: 'done', result });
 }

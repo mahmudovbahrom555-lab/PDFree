@@ -65,11 +65,17 @@ export async function doProcess(currentTool, extraParams = {}) {
     const run    = runnerMap[runner] ?? (() => _runStub(currentTool));
     await run();
   } catch (err) {
-    isProcessing = false;
-    setFilesLocked(false);
-    hideCancelBtn();
+    _finalize();
     _handleError(currentTool, err.message);
   }
+}
+
+// ── Private Helpers ────────────────────────────────────────────
+
+function _finalize() {
+  isProcessing = false;
+  setFilesLocked(false);
+  hideCancelBtn();
 }
 
 // ── Merge ──────────────────────────────────────────────────────
@@ -78,18 +84,12 @@ async function _runMerge(filesSnapshot) {
   const buffers = await Promise.all(filesSnapshot.map(f => f.arrayBuffer()));
   setProgress(10, 'Merging...');
 
-  // ⚠️  TRANSFERABLE: all buffers in `buffers` are transferred to the worker.
-  //     They are DETACHED here immediately after postMessage — do not read them.
-  _worker.postMessage({ tool: 'merge', files: buffers }, buffers);
-
   _worker.onmessage = (e) => {
     const data = e.data;
     if (data.type === 'progress') {
       setProgress(data.value, data.label);
     } else if (data.type === 'done') {
-      isProcessing = false;
-      setFilesLocked(false);
-      hideCancelBtn();
+      _finalize();
       setProgress(100, 'Done!');
       const blob = new Blob([data.result], { type: 'application/pdf' });
 
@@ -124,18 +124,18 @@ async function _runMerge(filesSnapshot) {
         );
       }
     } else if (data.type === 'error') {
-      isProcessing = false;
-      setFilesLocked(false);
-      hideCancelBtn();
+      _finalize();
       _handleError('merge', data.message);
     }
   };
   _worker.onerror = (e) => {
-    isProcessing = false;
-    setFilesLocked(false);
-    hideCancelBtn();
+    _finalize();
     _handleError('merge', e.message || 'Worker error');
   };
+
+  // ⚠️  TRANSFERABLE: all buffers in `buffers` are transferred to the worker.
+  //     They are DETACHED here immediately after postMessage — do not read them.
+  _worker.postMessage({ tool: 'merge', files: buffers }, buffers);
 }
 
 // ── Split ──────────────────────────────────────────────────────
@@ -143,14 +143,6 @@ async function _runMerge(filesSnapshot) {
 async function _runSplit(filesSnapshot, { pages, mode }) {
   const buffer = await filesSnapshot[0].arrayBuffer();
   setProgress(5, 'Loading PDF...');
-
-  // ⚠️  TRANSFERABLE CONTRACT: `buffer` was passed to worker as a Transferable.
-  //     It is now DETACHED here in the main thread — do not read it after this line.
-  //     The worker owns it until it sends `done`, at which point data.result
-  //     (single mode) or data.result[*].buffer (separate mode) are transferred
-  //     back and become the new owners. Each buffer must be consumed exactly once
-  //     (Blob constructor, JSZip.file()) and never stored for later reuse.
-  _worker.postMessage({ tool: 'split', file: buffer, options: { pages, mode } }, [buffer]);
 
   _worker.onmessage = async (e) => {
     const data = e.data;
@@ -188,32 +180,32 @@ async function _runSplit(filesSnapshot, { pages, mode }) {
           filename = 'split_pages.zip';
         }
 
-        isProcessing = false;
-        setFilesLocked(false);
-        hideCancelBtn();
+        _finalize();
         setProgress(100, 'Done!');
         document.dispatchEvent(new CustomEvent('pdfree:success', {
           detail: { tool: 'split', blob, desc, filename }
         }));
       } catch (err) {
-        isProcessing = false;
-        setFilesLocked(false);
-        hideCancelBtn();
+        _finalize();
         _handleError('split', err.message);
       }
     } else if (data.type === 'error') {
-      isProcessing = false;
-      setFilesLocked(false);
-      hideCancelBtn();
+      _finalize();
       _handleError('split', data.message);
     }
   };
   _worker.onerror = (e) => {
-    isProcessing = false;
-    setFilesLocked(false);
-    hideCancelBtn();
+    _finalize();
     _handleError('split', e.message || 'Worker error');
   };
+
+  // ⚠️  TRANSFERABLE CONTRACT: `buffer` was passed to worker as a Transferable.
+  //     It is now DETACHED here in the main thread — do not read it after this line.
+  //     The worker owns it until it sends `done`, at which point data.result
+  //     (single mode) or data.result[*].buffer (separate mode) are transferred
+  //     back and become the new owners. Each buffer must be consumed exactly once
+  //     (Blob constructor, JSZip.file()) and never stored for later reuse.
+  _worker.postMessage({ tool: 'split', file: buffer, options: { pages, mode } }, [buffer]);
 }
 
 // ── Compress ───────────────────────────────────────────────────
@@ -223,20 +215,12 @@ async function _runCompress(filesSnapshot, { preset = 'medium', preserveText = t
   const buffer = await file.arrayBuffer();
   setProgress(5, 'Loading PDF…');
 
-  // ⚠️  TRANSFERABLE: buffer detached after this call — worker owns it until done.
-  _worker.postMessage(
-    { tool: 'compress', file: buffer, options: { preset, preserveText } },
-    [buffer]
-  );
-
   _worker.onmessage = (e) => {
     const data = e.data;
     if (data.type === 'progress') {
       setProgress(data.value, data.label);
     } else if (data.type === 'done') {
-      isProcessing = false;
-      setFilesLocked(false);
-      hideCancelBtn();
+      _finalize();
       setProgress(100, 'Done!');
 
       // Guard: worker must return an ArrayBuffer. Any other type means
@@ -279,19 +263,21 @@ async function _runCompress(filesSnapshot, { preset = 'medium', preserveText = t
         showToast('⚠️ Encrypted PDF was processed with limitations', 5000);
       }
     } else if (data.type === 'error') {
-      isProcessing = false;
-      setFilesLocked(false);
-      hideCancelBtn();
+      _finalize();
       _handleError('compress', data.message);
     }
   };
 
   _worker.onerror = (e) => {
-    isProcessing = false;
-    setFilesLocked(false);
-    hideCancelBtn();
+    _finalize();
     _handleError('compress', e.message || 'Worker error');
   };
+
+  // ⚠️  TRANSFERABLE: buffer detached after this call — worker owns it until done.
+  _worker.postMessage(
+    { tool: 'compress', file: buffer, options: { preset, preserveText } },
+    [buffer]
+  );
 }
 
 // ── JPG → PDF ──────────────────────────────────────────────────
@@ -301,11 +287,6 @@ async function _runJpg2Pdf(filesSnapshot, params) {
   const buffers = await Promise.all(filesSnapshot.map(f => f.arrayBuffer()));
   setProgress(5, 'Loading images…');
 
-  _worker.postMessage(
-    { tool: 'jpg2pdf', files: buffers, options: params },
-    buffers   // All buffers as Transferables (zero-copy)
-  );
-
   _worker.onmessage = (e) => {
     const data = e.data;
     if (data.type === 'progress') {
@@ -314,9 +295,7 @@ async function _runJpg2Pdf(filesSnapshot, params) {
       if (!(data.result instanceof ArrayBuffer)) {
         _handleError('jpg2pdf', 'Unexpected result from worker'); return;
       }
-      isProcessing = false;
-      setFilesLocked(false);
-      hideCancelBtn();
+      _finalize();
       setProgress(100, 'Done!');
 
       const blob     = new Blob([data.result], { type: 'application/pdf' });
@@ -336,14 +315,19 @@ async function _runJpg2Pdf(filesSnapshot, params) {
         detail: { tool: 'jpg2pdf', blob, desc, filename }
       }));
     } else if (data.type === 'error') {
-      isProcessing = false; setFilesLocked(false); hideCancelBtn();
+      _finalize();
       _handleError('jpg2pdf', data.message);
     }
   };
   _worker.onerror = (e) => {
-    isProcessing = false; setFilesLocked(false); hideCancelBtn();
+    _finalize();
     _handleError('jpg2pdf', e.message || 'Worker error');
   };
+
+  _worker.postMessage(
+    { tool: 'jpg2pdf', files: buffers, options: params },
+    buffers   // All buffers as Transferables (zero-copy)
+  );
 }
 
 // ── PDF → JPG ──────────────────────────────────────────────────
@@ -382,20 +366,12 @@ async function _runPdf2Jpg(filesSnapshot, params) {
   const buffer = await file.arrayBuffer();
   setProgress(5, 'Loading PDF…');
 
-  // ⚠️  TRANSFERABLE: buffer detached after this call.
-  _worker.postMessage(
-    { tool: 'pdf2jpg', file: buffer, options: params },
-    [buffer]
-  );
-
   _worker.onmessage = async (e) => {
     const data = e.data;
     if (data.type === 'progress') {
       setProgress(data.value, data.label);
     } else if (data.type === 'done') {
-      isProcessing = false;
-      setFilesLocked(false);
-      hideCancelBtn();
+      _finalize();
       setProgress(100, 'Done!');
 
       const { result, format, zip, successCount } = data;
@@ -431,15 +407,21 @@ async function _runPdf2Jpg(filesSnapshot, params) {
         detail: { tool: 'pdf2jpg', blob: finalBlob, desc: finalDesc, filename: finalFilename }
       }));
     } else if (data.type === 'error') {
-      isProcessing = false; setFilesLocked(false); hideCancelBtn();
+      _finalize();
       _handleError('pdf2jpg', data.message);
     }
   };
 
   _worker.onerror = (e) => {
-    isProcessing = false; setFilesLocked(false); hideCancelBtn();
+    _finalize();
     _handleError('pdf2jpg', e.message || 'Worker error');
   };
+
+  // ⚠️  TRANSFERABLE: buffer detached after this call.
+  _worker.postMessage(
+    { tool: 'pdf2jpg', file: buffer, options: params },
+    [buffer]
+  );
 }
 
 // ── Generic single-file worker tool ───────────────────────────
@@ -457,12 +439,6 @@ async function _runWorkerTool(tool, filesSnapshot, params) {
   };
   setProgress(5, labelMap[tool] || 'Processing…');
 
-  // ⚠️  TRANSFERABLE: buffer detached after this call — worker owns it until done.
-  _worker.postMessage(
-    { tool, file: buffer, options: params },
-    [buffer]
-  );
-
   _worker.onmessage = (e) => {
     const data = e.data;
     if (data.type === 'progress') {
@@ -471,9 +447,7 @@ async function _runWorkerTool(tool, filesSnapshot, params) {
       if (!(data.result instanceof ArrayBuffer)) {
         _handleError(tool, 'Unexpected result from worker'); return;
       }
-      isProcessing = false;
-      setFilesLocked(false);
-      hideCancelBtn();
+      _finalize();
       setProgress(100, 'Done!');
 
       const blob = new Blob([data.result], { type: 'application/pdf' });
@@ -491,15 +465,21 @@ async function _runWorkerTool(tool, filesSnapshot, params) {
         detail: { tool, blob, desc: descMap[tool] || fmtSize(blob.size), filename }
       }));
     } else if (data.type === 'error') {
-      isProcessing = false; setFilesLocked(false); hideCancelBtn();
+      _finalize();
       _handleError(tool, data.message);
     }
   };
 
   _worker.onerror = (e) => {
-    isProcessing = false; setFilesLocked(false); hideCancelBtn();
+    _finalize();
     _handleError(tool, e.message || 'Worker error');
   };
+
+  // ⚠️  TRANSFERABLE: buffer detached after this call — worker owns it until done.
+  _worker.postMessage(
+    { tool, file: buffer, options: params },
+    [buffer]
+  );
 }
 
 // ── Stub ──────────────────────────────────────────────────────
@@ -508,9 +488,7 @@ async function _runStub(tool) {
   const msg = TOOLS[tool]?.comingSoon || '🚧 This tool is coming soon!';
   await new Promise(r => setTimeout(r, 400));
   if (!isProcessing) return;
-  isProcessing = false;
-  setFilesLocked(false);
-  hideCancelBtn();
+  _finalize();
   hideProgress();
   setButtonReady(TOOLS[tool].btn);
   showToast(msg, 5000);

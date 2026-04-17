@@ -64,6 +64,13 @@ function showTool(tool) {
   id('fileInput').multiple = t.multi;
   id('fileInput').accept   = t.accept;
 
+  document.querySelectorAll('.tool-card').forEach(card => {
+    card.setAttribute('aria-pressed', card.dataset.tool === tool ? 'true' : 'false');
+  });
+  document.querySelectorAll('.nav-link').forEach(link => {
+    link.setAttribute('aria-pressed', link.dataset.tool === tool ? 'true' : 'false');
+  });
+
   // Скрываем панели инструментов при переходе
   hideAllToolOptions();
 

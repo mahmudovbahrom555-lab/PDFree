@@ -52,7 +52,7 @@ export async function initPdf2JpgOptions(file) {
     const url = URL.createObjectURL(file);
     let doc;
     try {
-      doc = await window.pdfjsLib.getDocument({ url, disableWorker: false }).promise;
+      doc = await window.pdfjsLib.getDocument({ url, disableWorker: true }).promise;
       // pdf.js copies the entire file into its own memory during the await above.
       // The object URL is no longer referenced after getDocument resolves,
       // so we revoke immediately. try/finally ensures revoke happens even if
