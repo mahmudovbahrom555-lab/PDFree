@@ -467,6 +467,7 @@ async function handleJpg2Pdf(fileBuffers, options) {
 
     // bitmap is now open — must be closed in all code paths below
     let embedded;
+    let canvasW, canvasH;
     try {
       const origW = bitmap.width;
       const origH = bitmap.height;
@@ -477,7 +478,7 @@ async function handleJpg2Pdf(fileBuffers, options) {
       const realH = isRotated90 ? origW : origH;
 
       // 3. Calculate output canvas size (after EXIF fix)
-      let canvasW = realW, canvasH = realH;
+      canvasW = realW; canvasH = realH;
       if (compress) {
         // IMAGE_DIM_PRESETS.medium from config.js — worker can't import ES modules,
         // so this mirrors that value. If you change the preset, update both places.
