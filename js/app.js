@@ -337,8 +337,15 @@ let _installShown = false;
 function _initPWA() {
   // Register service worker
   if ('serviceWorker' in navigator) {
-    navigator.serviceWorker.register('/sw.js')
-      .catch(err => console.warn('[SW] Registration failed:', err));
+    window.addEventListener('load', () => {
+      const swUrl = new URL('../sw.js', import.meta.url).href;
+      navigator.serviceWorker.register(swUrl)
+        .then(reg => {
+          // updatefound is fired if sw.js changes.
+          reg.addEventListener('updatefound', () => {});
+        })
+        .catch(err => console.warn('[SW] Registration failed:', err));
+    });
   }
 
   // Capture the deferred prompt

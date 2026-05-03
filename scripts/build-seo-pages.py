@@ -48,7 +48,13 @@ for tool, meta in TOOLS.items():
     html = index_html
     html = re.sub(r'(href|src)="css/', r'\1="../css/', html)
     html = re.sub(r'(href|src)="js/', r'\1="../js/', html)
-    html = re.sub(r'(href|src)="img/', r'\1="../img/', html)
+    html = html.replace('href="manifest.json"', 'href="../manifest.json"')
+    html = html.replace('href="icons/icon-192.png"', 'href="../icons/icon-192.png"')
+    
+    # Fix tool links to be relative to parent to prevent nested paths like split-pdf/split-pdf/
+    for t in TOOLS.keys():
+        t_folder = t if 'pdf' in t else f"{t}-pdf"
+        html = html.replace(f'href="{t_folder}/"', f'href="../{t_folder}/"')
     
     html = html.replace('<title>PDFree — Free PDF Tools, No Limits</title>', f'<title>{meta["title"]} — PDFree</title>')
     html = html.replace('<meta name="description" content="Free, unlimited PDF tools. Merge, split, compress, protect, watermark and convert PDFs securely in your browser. All processing is 100% private and happens offline.">', f'<meta name="description" content="{meta["desc"]}">')
