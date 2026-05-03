@@ -7,7 +7,7 @@
 // ============================================================
 
 /** Build version — used to detect stale SW cache in console */
-export const APP_VERSION = '6.4';
+export const APP_VERSION = '6.5';
 
 /** Ko-fi / донат ссылка. Замени на свою! */
 export const DONATE_URL = 'https://ko-fi.com/YOUR_USERNAME';

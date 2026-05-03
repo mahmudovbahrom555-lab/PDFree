@@ -306,7 +306,7 @@ async function _ensurePdfJs() {
 async function _loadWithRetry(retriesLeft) {
   try {
     await _loadScript(`${PDFJS_CDN}/pdf.min.js`);
-    window.pdfjsLib.GlobalWorkerOptions.workerSrc = './js/vendor/pdf.worker.min.js';
+    window.pdfjsLib.GlobalWorkerOptions.workerSrc = new URL('./vendor/pdf.worker.min.js', import.meta.url).toString();
   } catch (err) {
     if (retriesLeft > 0) {
       // Exponential backoff: 1s before first retry, 2s before second

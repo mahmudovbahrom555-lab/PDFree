@@ -16,7 +16,7 @@ let _worker = _createWorker();
 export let isProcessing = false;
 
 function _createWorker() {
-  return new Worker('./js/worker.js');
+  return new Worker(new URL('./worker.js', import.meta.url));
 }
 
 // ── Cancel ────────────────────────────────────────────────────
