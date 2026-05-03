@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="{{ lang }}">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -70,26 +70,23 @@
     worker-src  'self' blob:;
     object-src  'none';
   ">
-  <title>Merge PDF files online — free, no signup</title>
-  <meta name="description" content="Combine unlimited PDF files instantly. 100% private, no uploads, no file size limits.">
-  <meta property="og:title"       content="Merge PDF files online — free, no signup">
-  <meta property="og:description" content="Combine unlimited PDF files instantly. 100% private, no uploads, no file size limits.">
+  <title>{{ t('seo.merge.title') }}</title>
+  <meta name="description" content="{{ t('seo.merge.desc') }}">
+  <meta property="og:title"       content="{{ t('seo.merge.title') }}">
+  <meta property="og:description" content="{{ t('seo.merge.desc') }}">
   <meta property="og:type"        content="website">
   
-  <link rel="canonical" href="https://mahmudovbahrom555-lab.github.io/PDFree/watermark-pdf/">
-    <link rel="alternate" hreflang="en" href="https://mahmudovbahrom555-lab.github.io/PDFree/watermark-pdf/">
-  <link rel="alternate" hreflang="es" href="https://mahmudovbahrom555-lab.github.io/PDFree/es/marca-de-agua-pdf/">
-  <link rel="alternate" hreflang="pt" href="https://mahmudovbahrom555-lab.github.io/PDFree/pt/marca-dagua-pdf/">
-  <link rel="alternate" hreflang="x-default" href="https://mahmudovbahrom555-lab.github.io/PDFree/watermark-pdf/">
+  <link rel="canonical" href="{{ canonical_url }}">
+  {{ hreflang_tags|safe }}
 
   <!-- PWA -->
-  <link rel="manifest" href="../manifest.json">
+  <link rel="manifest" href="manifest.json">
   <meta name="theme-color" content="#2D7A4F">
   <meta name="mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="default">
   <meta name="apple-mobile-web-app-title" content="PDFree">
-  <link rel="apple-touch-icon" href="../icons/icon-192.png">
+  <link rel="apple-touch-icon" href="icons/icon-192.png">
 
   <!-- Privacy-first analytics (no cookies, GDPR compliant) -->
   <!-- Replace pdfree.com with your actual domain after deployment -->
@@ -98,10 +95,10 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
 
-  <link rel="stylesheet" href="../css/variables.css">
-  <link rel="stylesheet" href="../css/animations.css">
-  <link rel="stylesheet" href="../css/layout.css">
-  <link rel="stylesheet" href="../css/components.css">
+  <link rel="stylesheet" href="css/variables.css">
+  <link rel="stylesheet" href="css/animations.css">
+  <link rel="stylesheet" href="css/layout.css">
+  <link rel="stylesheet" href="css/components.css">
 
   <!--
     ══════════════════════════════════════════════════════
@@ -121,15 +118,15 @@
 <body>
 
   <nav>
-    <a href="../" class="logo" id="logo" aria-label="Go to homepage" style="text-decoration:none">PDF<span>ree</span></a>
+    <a href="{{ base_url }}" class="logo" id="logo" aria-label="Go to homepage" style="text-decoration:none">PDF<span>{{ t('ui.nav.logo_span') }}</span></a>
     <div class="nav-links">
-      <a href="../merge-pdf/" class="nav-link" data-tool="merge">Merge</a>
-      <a href="../split-pdf/" class="nav-link" data-tool="split">Split</a>
-      <a href="../compress-pdf/" class="nav-link" data-tool="compress">Compress</a>
-      <a href="../jpg2pdf/" class="nav-link" data-tool="jpg2pdf">JPG→PDF</a>
-      <a href="../watermark-pdf/" class="nav-link" data-tool="watermark">Watermark</a>
-      <a href="../meta-pdf/" class="nav-link" data-tool="meta">Metadata</a>
-      <a href="../protect-pdf/" class="nav-link" data-tool="protect">Protect</a>
+      <a href="{{ url('merge') }}" class="nav-link" data-tool="merge">{{ t('ui.nav.merge') }}</a>
+      <a href="{{ url('split') }}" class="nav-link" data-tool="split">{{ t('ui.nav.split') }}</a>
+      <a href="{{ url('compress') }}" class="nav-link" data-tool="compress">{{ t('ui.nav.compress') }}</a>
+      <a href="{{ url('jpg2pdf') }}" class="nav-link" data-tool="jpg2pdf">{{ t('ui.nav.jpg2pdf') }}</a>
+      <a href="{{ url('watermark') }}" class="nav-link" data-tool="watermark">{{ t('ui.nav.watermark') }}</a>
+      <a href="{{ url('meta') }}" class="nav-link" data-tool="meta">{{ t('ui.nav.meta') }}</a>
+      <a href="{{ url('protect') }}" class="nav-link" data-tool="protect">{{ t('ui.nav.protect') }}</a>
     </div>
   </nav>
 
@@ -159,9 +156,9 @@
 
   <!-- ── Hero ── -->
   <section id="hero" class="hero">
-    <div class="hero-badge">🔒 100% private · no upload · no signup · no limits</div>
-    <h1>PDF tools that<br><em>actually work</em></h1>
-    <p>Merge, split, compress, watermark, convert — everything runs <strong>in your browser</strong>. Your files never leave your device. No server. No account. Just results.</p>
+    <div class="hero-badge">{{ t('ui.hero.badge') }}</div>
+    <h1>{{ t('ui.hero.h1_1') }}<br><em>{{ t('ui.hero.h1_em') }}</em></h1>
+    <p>{{ t('ui.hero.p_1') }} <strong>{{ t('ui.hero.p_strong') }}</strong>{{ t('ui.hero.p_2') }}</p>
   </section>
 
   <!-- ── Privacy banner (compact inline) ── -->
@@ -175,32 +172,32 @@
 
   <!-- ── No-limit bar ── -->
   <div id="noLimitBar" class="no-limit-bar">
-    <div class="no-limit-item"><span>✓</span> No file limits</div>
-    <div class="no-limit-item"><span>✓</span> No watermarks</div>
-    <div class="no-limit-item"><span>✓</span> No signup</div>
-    <div class="no-limit-item"><span>🔒</span> Files never leave your device</div>
+    <div class="no-limit-item"><span>✓</span> {{ t('ui.no_limit.1') }}</div>
+    <div class="no-limit-item"><span>✓</span> {{ t('ui.no_limit.2') }}</div>
+    <div class="no-limit-item"><span>✓</span> {{ t('ui.no_limit.3') }}</div>
+    <div class="no-limit-item"><span>🔒</span> {{ t('ui.no_limit.4') }}</div>
   </div>
 
   <!-- ── Tools grid ── -->
   <section id="toolsGrid" class="tools-section">
-    <div class="section-label">All tools</div>
+    <div class="section-label">{{ t('ui.tools.label') }}</div>
     <div class="tools-grid">
-      <a href="../merge-pdf/" class="tool-card featured" data-tool="merge" aria-label="Merge PDF">
+      <a href="{{ url('merge') }}" class="tool-card featured" data-tool="merge" aria-label="Merge PDF">
         <span class="tool-icon">🔗</span>
-        <div class="tool-name">Merge PDF files</div>
-        <div class="tool-desc">Combine unlimited PDF files — no restrictions</div>
+        <div class="tool-name">{{ t('ui.tool.merge.name') }}</div>
+        <div class="tool-desc">{{ t('ui.tool.merge.desc') }}</div>
       </a>
-      <a href="../split-pdf/" class="tool-card" data-tool="split"><span class="tool-icon">✂️</span><div class="tool-name">Split PDF</div><div class="tool-desc">Extract pages or split into separate files</div></a>
-      <a href="../compress-pdf/" class="tool-card" data-tool="compress"><span class="tool-icon">🗜️</span><div class="tool-name">Compress PDF</div><div class="tool-desc">Reduce file size without losing quality</div></a>
-      <a href="../jpg2pdf/" class="tool-card" data-tool="jpg2pdf"><span class="tool-icon">🖼️</span><div class="tool-name">JPG to PDF</div><div class="tool-desc">Convert images to PDF instantly</div></a>
-      <a href="../pdf2jpg/" class="tool-card" data-tool="pdf2jpg"><span class="tool-icon">📸</span><div class="tool-name">PDF to JPG</div><div class="tool-desc">Extract pages as high-quality images</div></a>
-      <a href="../extract-pdf/" class="tool-card" data-tool="extract"><span class="tool-icon">📑</span><div class="tool-name">Extract Pages</div><div class="tool-desc">Pull selected pages into a new PDF</div></a>
-      <a href="../watermark-pdf/" class="tool-card" data-tool="watermark"><span class="tool-icon">💧</span><div class="tool-name">Watermark</div><div class="tool-desc">Stamp text on every page — diagonal or tiled</div></a>
-      <a href="../pagenum-pdf/" class="tool-card" data-tool="pagenum"><span class="tool-icon">🔢</span><div class="tool-name">Page Numbers</div><div class="tool-desc">Add numbered footers — Arabic, Roman or ABC</div></a>
-      <a href="../meta-pdf/" class="tool-card" data-tool="meta"><span class="tool-icon">🏷️</span><div class="tool-name">Edit Metadata</div><div class="tool-desc">View and edit title, author, keywords</div></a>
-      <a href="../redact-pdf/" class="tool-card" data-tool="redact"><span class="tool-icon">🖌️</span><div class="tool-name">Cover Area</div><div class="tool-desc">Hide watermarks, signatures or sensitive data locally</div></a>
-      <a href="../rotate-pdf/" class="tool-card" data-tool="rotate"><span class="tool-icon">🔄</span><div class="tool-name">Rotate PDF</div><div class="tool-desc">Fix page orientation in any PDF</div></a>
-      <a href="../protect-pdf/" class="tool-card" data-tool="protect"><span class="tool-icon">🔒</span><div class="tool-name">Protect PDF</div><div class="tool-desc">AES-256 password & permissions — 100% private</div></a>
+      <a href="{{ url('split') }}" class="tool-card" data-tool="split"><span class="tool-icon">✂️</span><div class="tool-name">{{ t('ui.tool.split.name') }}</div><div class="tool-desc">{{ t('ui.tool.split.desc') }}</div></a>
+      <a href="{{ url('compress') }}" class="tool-card" data-tool="compress"><span class="tool-icon">🗜️</span><div class="tool-name">{{ t('ui.tool.compress.name') }}</div><div class="tool-desc">{{ t('ui.tool.compress.desc') }}</div></a>
+      <a href="{{ url('jpg2pdf') }}" class="tool-card" data-tool="jpg2pdf"><span class="tool-icon">🖼️</span><div class="tool-name">{{ t('ui.tool.jpg2pdf.name') }}</div><div class="tool-desc">{{ t('ui.tool.jpg2pdf.desc') }}</div></a>
+      <a href="{{ url('pdf2jpg') }}" class="tool-card" data-tool="pdf2jpg"><span class="tool-icon">📸</span><div class="tool-name">{{ t('ui.tool.pdf2jpg.name') }}</div><div class="tool-desc">{{ t('ui.tool.pdf2jpg.desc') }}</div></a>
+      <a href="{{ url('extract') }}" class="tool-card" data-tool="extract"><span class="tool-icon">📑</span><div class="tool-name">{{ t('ui.tool.extract.name') }}</div><div class="tool-desc">{{ t('ui.tool.extract.desc') }}</div></a>
+      <a href="{{ url('watermark') }}" class="tool-card" data-tool="watermark"><span class="tool-icon">💧</span><div class="tool-name">{{ t('ui.tool.watermark.name') }}</div><div class="tool-desc">{{ t('ui.tool.watermark.desc') }}</div></a>
+      <a href="{{ url('pagenum') }}" class="tool-card" data-tool="pagenum"><span class="tool-icon">🔢</span><div class="tool-name">{{ t('ui.tool.pagenum.name') }}</div><div class="tool-desc">{{ t('ui.tool.pagenum.desc') }}</div></a>
+      <a href="{{ url('meta') }}" class="tool-card" data-tool="meta"><span class="tool-icon">🏷️</span><div class="tool-name">{{ t('ui.tool.meta.name') }}</div><div class="tool-desc">{{ t('ui.tool.meta.desc') }}</div></a>
+      <a href="{{ url('redact') }}" class="tool-card" data-tool="redact"><span class="tool-icon">🖌️</span><div class="tool-name">{{ t('ui.tool.redact.name') }}</div><div class="tool-desc">{{ t('ui.tool.redact.desc') }}</div></a>
+      <a href="{{ url('rotate') }}" class="tool-card" data-tool="rotate"><span class="tool-icon">🔄</span><div class="tool-name">{{ t('ui.tool.rotate.name') }}</div><div class="tool-desc">{{ t('ui.tool.rotate.desc') }}</div></a>
+      <a href="{{ url('protect') }}" class="tool-card" data-tool="protect"><span class="tool-icon">🔒</span><div class="tool-name">{{ t('ui.tool.protect.name') }}</div><div class="tool-desc">{{ t('ui.tool.protect.desc') }}</div></a>
     </div>
   </section>
 
@@ -210,22 +207,22 @@
       <div class="privacy-bar__item">
         <span class="privacy-bar__icon" aria-hidden="true">🔒</span>
         <div>
-          <strong>100% private by design</strong>
-          <p>Your files are processed entirely in your browser. Zero uploads — ever.</p>
+          <strong>{{ t('ui.privacy.1.title') }}</strong>
+          <p>{{ t('ui.privacy.1.desc') }}</p>
         </div>
       </div>
       <div class="privacy-bar__item">
         <span class="privacy-bar__icon" aria-hidden="true">⚙️</span>
         <div>
-          <strong>Runs on your device</strong>
-          <p>All PDF operations run inside a Web Worker — a sandboxed thread in your own hardware.</p>
+          <strong>{{ t('ui.privacy.2.title') }}</strong>
+          <p>{{ t('ui.privacy.2.desc') }}</p>
         </div>
       </div>
       <div class="privacy-bar__item">
         <span class="privacy-bar__icon" aria-hidden="true">🗑️</span>
         <div>
-          <strong>Instantly forgotten</strong>
-          <p>Files live only in RAM. Close the tab and they vanish — no logs, no traces.</p>
+          <strong>{{ t('ui.privacy.3.title') }}</strong>
+          <p>{{ t('ui.privacy.3.desc') }}</p>
         </div>
       </div>
     </div>
@@ -257,22 +254,22 @@
     <div class="tool-header">
       <div class="tool-header-icon" id="toolIcon" aria-hidden="true">🔗</div>
       <div class="tool-header-text">
-        <h2 id="toolTitle">Merge PDF files online — free, no signup</h2>
-        <p  id="toolDesc">Combine unlimited PDF files instantly. 100% private, no uploads, no file size limits.</p>
+        <h2 id="toolTitle">{{ t('seo.merge.title') }}</h2>
+        <p  id="toolDesc">{{ t('seo.merge.desc') }}</p>
       </div>
     </div>
 
     <div id="dropZone" class="drop-zone" tabindex="0" role="button" aria-label="Upload files — click or drag and drop">
       <input type="file" id="fileInput" multiple accept=".pdf" aria-hidden="true">
       <span class="drop-icon" aria-hidden="true">📂</span>
-      <div class="drop-title">Drop files here</div>
-      <div class="drop-sub">or click to browse — any number of files</div>
-      <button class="drop-btn" id="chooseFilesBtn" type="button">Choose files</button>
+      <div class="drop-title">{{ t('ui.workspace.drop_title') }}</div>
+      <div class="drop-sub">{{ t('ui.workspace.drop_sub') }}</div>
+      <button class="drop-btn" id="chooseFilesBtn" type="button">{{ t('ui.workspace.choose_btn') }}</button>
     </div>
 
     <div id="fileList"    class="file-list" aria-live="polite" aria-label="Selected files"></div>
     <div id="fileCount"   class="file-count"   style="display:none"></div>
-    <div id="reorderHint" class="reorder-hint" style="display:none">↕ Drag to reorder files before merging</div>
+    <div id="reorderHint" class="reorder-hint" style="display:none">{{ t('ui.workspace.reorder') }}</div>
 
     <div id="splitOptions"    class="split-options"   style="display:none" aria-label="Split options"></div>
     <div id="compressOptions" class="compress-options" style="display:none" aria-label="Compression options"></div>
@@ -285,8 +282,8 @@
     <div id="redactOptions"   class="j2p-options"     style="display:none" aria-label="Cover Area options"></div>
     <div id="rotateOptions"   class="j2p-options"     style="display:none" aria-label="Rotate PDF options"></div>
 
-    <button id="mergeBtn"  class="merge-btn"  type="button" disabled data-mode="process">Merge PDF files</button>
-    <button id="cancelBtn" class="cancel-btn" type="button" style="display:none" aria-label="Cancel processing">✕ Cancel</button>
+    <button id="mergeBtn"  class="merge-btn"  type="button" disabled data-mode="process">{{ t('ui.tool.merge.name') }}</button>
+    <button id="cancelBtn" class="cancel-btn" type="button" style="display:none" aria-label="Cancel processing">{{ t('ui.workspace.cancel') }}</button>
 
     <div id="progressBar"   class="progress-bar"><div id="progressFill" class="progress-fill"></div></div>
     <div id="progressLabel" class="progress-label"></div>
@@ -296,10 +293,10 @@
       <div class="success-top">
         <div class="success-icon" aria-hidden="true">✓</div>
         <div class="success-text">
-          <h3 id="successTitle">Done!</h3>
+          <h3 id="successTitle">{{ t('ui.success.title') }}</h3>
           <p  id="successDesc"></p>
         </div>
-        <button id="downloadBtn" class="download-btn" type="button">⬇ Download</button>
+        <button id="downloadBtn" class="download-btn" type="button">{{ t('ui.success.download') }}</button>
       </div>
 
       <!-- Feedback — priority #0: directly under download, same visual weight -->
@@ -359,16 +356,16 @@
   <!-- ── SEO Content (for indexing) ── -->
   <section class="seo-article" aria-labelledby="seoArticleTitle">
     <div class="seo-article__inner">
-      <h2 id="seoArticleTitle">The best free PDF tool for security and privacy</h2>
-      <p>PDFree is designed to provide professional-grade PDF manipulation without the risks associated with cloud uploads. When you use our tools, the processing happens directly inside your web browser using WebAssembly. This means your sensitive documents, such as legal contracts, financial reports, or personal ID scans, are never transmitted over the internet.</p>
-      <p>We believe essential tools should be accessible to everyone. That's why PDFree has absolutely no file size limits, no daily usage caps, and no mandatory watermarks. It is a completely free, unlimited utility built for students, professionals, and anyone who values digital privacy.</p>
+      <h2 id="seoArticleTitle">{{ t('seo.article.h2') }}</h2>
+      <p>{{ t('seo.article.p1') }}</p>
+      <p>{{ t('seo.article.p2') }}</p>
       
-      <h3>Frequently Asked Questions</h3>
+      <h3>{{ t('seo.faq.title') }}</h3>
       <dl class="seo-faq">
-        <dt>Are my files stored on your servers?</dt>
-        <dd>No. PDFree operates entirely on your device (client-side). We don't have servers that process your files, which guarantees 100% privacy.</dd>
-        <dt>Is there a limit to the file size or number of pages?</dt>
-        <dd>No, there are no artificial limits. The only limitation is the RAM (memory) available on your computer or smartphone.</dd>
+        <dt>{{ t('seo.faq.q1') }}</dt>
+        <dd>{{ t('seo.faq.a1') }}</dd>
+        <dt>{{ t('seo.faq.q2') }}</dt>
+        <dd>{{ t('seo.faq.a2') }}</dd>
       </dl>
     </div>
   </section>
@@ -390,8 +387,8 @@
   <div id="toast" class="toast" role="status" aria-live="polite"></div>
 
   <!-- JSZip and pdf-lib are now dynamically imported via ESM when needed -->
-  <script type="module" src="../js/feedback.js"></script>
-  <script type="module" src="../js/app.js?v=9"></script>
+  <script type="module" src="js/feedback.js"></script>
+  <script type="module" src="js/app.js?v=9"></script>
 
 </body>
 </html>
