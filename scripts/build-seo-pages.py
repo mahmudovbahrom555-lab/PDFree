@@ -58,12 +58,6 @@ for tool, meta in TOOLS.items():
     
     html = html.replace('<title>PDFree — Free PDF Tools, No Limits</title>', f'<title>{meta["title"]} — PDFree</title>')
     html = html.replace('<meta name="description" content="Free, unlimited PDF tools. Merge, split, compress, protect, watermark and convert PDFs securely in your browser. All processing is 100% private and happens offline.">', f'<meta name="description" content="{meta["desc"]}">')
-    html = html.replace('</body>', f'''
-  <script>
-    // Pre-select tool based on directory name
-    window.PDFREE_INITIAL_TOOL = '{tool}';
-  </script>
-</body>''')
 
     with open(os.path.join(tool_dir, 'index.html'), 'w', encoding='utf-8') as f:
         f.write(html)

@@ -51,6 +51,7 @@
                 'wasm-unsafe-eval'
                 blob:
                 https://cdnjs.cloudflare.com
+                https://esm.sh
                 https://plausible.io
                 https://pagead2.googlesyndication.com;
     style-src   'self' 'unsafe-inline'
@@ -368,17 +369,8 @@
   <div id="toast" class="toast" role="status" aria-live="polite"></div>
 
   <!-- JSZip and pdf-lib are now dynamically imported via ESM when needed -->
-  <!-- Inline version check: runs before modules, shows cache diagnostic in console -->
-  <script>
-    console.info('[PDFree] v6.6 loaded. If tools fail, open DevTools → Application → Service Workers → Unregister → hard reload (Ctrl+F5).');
-  </script>
   <script type="module" src="../js/feedback.js"></script>
   <script type="module" src="../js/app.js?v=9"></script>
 
-
-  <script>
-    // Pre-select tool based on directory name
-    window.PDFREE_INITIAL_TOOL = 'meta';
-  </script>
 </body>
 </html>
